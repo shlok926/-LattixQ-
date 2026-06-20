@@ -28,8 +28,25 @@ export function useAnalystChat() {
   }, [sessionId, isStreaming, contextEnabled, addUserMessage, addStreamingPlaceholder, appendStreamChunk, finalizeStreamMessage, markStreamError]);
 
   const cancelStream = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    const { streamingMessageId, finalizeStreamMessage, messages } = useAnalystStore.getState();
+    if (streamingMessageId) {
+      const msg = messages.find(m => m.id === streamingMessageId);
+      finalizeStreamMessage(
+        streamingMessageId,
+        {
+          type: "done",
+          risk_level: msg?.riskLevel || "MEDIUM",
+          confidence: msg?.confidence || "HIGH",
+          affects_algorithms: msg?.affectsAlgorithms || [],
+          next_steps: [],
+        },
+        intentRef.current
+      );
+    }
   }, []);
 
   return { sendMessage, cancelStream };

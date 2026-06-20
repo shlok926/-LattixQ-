@@ -1,6 +1,6 @@
 import { ChatRequest, SSEEvent, SSEStartEvent, SSEChunkEvent, SSEDoneEvent } from "../types/analyst.types";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/v1";
+const BASE = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const analystApi = {
   newSession: async (): Promise<string> => {
@@ -30,7 +30,15 @@ export const analystApi = {
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          let errMsg = `HTTP ${response.status}`;
+          try {
+            const errData = await response.json();
+            if (errData?.detail) errMsg = errData.detail;
+          } catch { /* ignore */ }
+          throw new Error(errMsg);
+        }
+        if (!response.body) throw new Error("No response body");
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
