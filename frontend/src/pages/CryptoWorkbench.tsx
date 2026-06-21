@@ -10,9 +10,13 @@ import {
   ShieldCheck, 
   Copy, 
   Check, 
-  Binary 
+  Binary,
+  Eye,
+  EyeOff,
+  ScanSearch
 } from 'lucide-react';
 import { api } from '../services/api';
+import Button from '../components/ui/Button';
 
 interface AlgorithmDetail {
   name: string;
@@ -102,14 +106,16 @@ const ALGORITHMS: Record<string, AlgorithmDetail> = {
   }
 };
 
-const SAMPLE_JWT = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.
-eyJpc3MiOiJxdWFudHVtc2hpZWxkLWF1dGgiLCJzdWIiOiJhZG1pbkBxdWFudHVtc2hpZWxkLmlvIiwiZXhwIjoxNzgzMTI2NDAwLCJyb2xlcyI6WyJTRUNVUklUWV9BTkFMWVNUIl19.
-VulnerableSignatureDemoStringCheckOnlyNotRealCrypto`;
+const SAMPLE_JWT = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.` +
+  `eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkxhdHRpeCAtUSBEZW1vIFVzZXIiLCJpc3MiOiJsYXR0aXgtcS1hdXRoIiwiaWF0IjoxNzE4ODAwMDAwLCJleHAiOjE3MTg4MDM2MDB9.` +
+  `cWJzUjU0V0c5aGtkc3lhZmhrc2RhZmhrc2RhZmhrYWZzaGthZnNkYWZzZGFfszRfZmFzZGFmY3Z4Ynp2eGNieHpyZXdxd2VydHl1aW9wYXNkZmdoamtsenhjdmJubVFXRVJURlVJU0RGR0hKS0xYWkNWQk5NMTIzNDU2Nzg5MC1fZ2hqa2xzZGFmaGthZnNkYWZzZGFmc2RmYWZzZGFmY3Z4Ynp2eGNieHpyZXdxd2VydHl1aW9wYXNkZmdoamtsenhjdmJubVFXRVJURlVJU0RGR0hKS0xYWkNWQk5NMTIzNDU2Nzg5MC1fZ2hqa2xzZGFmaGthZnNkYWZzZGFmY3Z4Ynp2eGNieHpyZXdxd2VydHlh`;
 
 export const CryptoWorkbench: React.FC = () => {
   // State for Sandbox
   const [selectedAlg, setSelectedAlg] = useState<string>('ML-KEM-768');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [flashSuccess, setFlashSuccess] = useState<boolean>(false);
+  const [isPrivKeyRevealed, setIsPrivKeyRevealed] = useState<boolean>(false);
   const [keys, setKeys] = useState<{ pub: string; priv: string } | null>(null);
   const [copiedField, setCopiedField] = useState<'pub' | 'priv' | null>(null);
 
@@ -118,6 +124,7 @@ export const CryptoWorkbench: React.FC = () => {
 
   // State for JWT Auditor
   const [jwtInput, setJwtInput] = useState<string>(SAMPLE_JWT);
+  const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [jwtResult, setJwtResult] = useState<{
     header: Record<string, any>;
     payload: Record<string, any>;
@@ -129,6 +136,7 @@ export const CryptoWorkbench: React.FC = () => {
   const handleGenerateKeys = async () => {
     setIsGenerating(true);
     setKeys(null);
+    setIsPrivKeyRevealed(false); // reset reveal state to blurred
     try {
       if (selectedAlg === 'RSA-2048') {
         const response = await api.post('/classical/rsa/keygen', { key_size: 2048 });
@@ -162,6 +170,8 @@ export const CryptoWorkbench: React.FC = () => {
           priv: randomHex
         });
       }
+      setFlashSuccess(true);
+      setTimeout(() => setFlashSuccess(false), 600);
     } catch (error) {
       console.error("Failed to generate keys via backend, falling back to mock", error);
       const randomHex = (len: number) => {
@@ -182,6 +192,8 @@ export const CryptoWorkbench: React.FC = () => {
           : `-----BEGIN PUBLIC KEY-----\n${randomHex(byteSize * 2)}\n-----END PUBLIC KEY-----`,
         priv: `-----BEGIN PRIVATE KEY-----\n${randomHex(byteSize * 3)}\n-----END PRIVATE KEY-----`
       });
+      setFlashSuccess(true);
+      setTimeout(() => setFlashSuccess(false), 600);
     } finally {
       setIsGenerating(false);
     }
@@ -191,34 +203,40 @@ export const CryptoWorkbench: React.FC = () => {
   const copyToClipboard = (text: string, field: 'pub' | 'priv') => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    setTimeout(() => setCopiedField(null), 1500);
   };
 
   // JWT Auditor Trigger
   const handleAuditJwt = () => {
-    try {
-      const parts = jwtInput.trim().split('.');
-      if (parts.length < 2) {
-        alert('Invalid JWT format');
-        return;
-      }
-      const headerDecoded = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
-      const payloadDecoded = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      
-      const alg = headerDecoded.alg || 'unknown';
-      const isVulnerable = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'HS256', 'HS384'].includes(alg);
+    if (!jwtInput.trim()) return;
+    setIsAuditing(true);
+    setTimeout(() => {
+      try {
+        const parts = jwtInput.trim().split('.');
+        if (parts.length < 2) {
+          alert('Invalid JWT format');
+          return;
+        }
+        const headerDecoded = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+        const payloadDecoded = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        
+        const alg = headerDecoded.alg || 'unknown';
+        const isVulnerable = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'HS256', 'HS384'].includes(alg);
 
-      setJwtResult({
-        header: headerDecoded,
-        payload: payloadDecoded,
-        verdict: isVulnerable ? 'VULNERABLE' : 'SAFE',
-        reason: isVulnerable 
-          ? `Algorithm ${alg} relies on integer factorization or discrete logarithm, broken by Shor's algorithm.`
-          : `Algorithm ${alg} is considered quantum-safe.`
-      });
-    } catch (err) {
-      alert('Failed to parse JWT. Ensure it is base64 encoded.');
-    }
+        setJwtResult({
+          header: headerDecoded,
+          payload: payloadDecoded,
+          verdict: isVulnerable ? 'VULNERABLE' : 'SAFE',
+          reason: isVulnerable 
+            ? `Algorithm ${alg} relies on integer factorization or discrete logarithm, broken by Shor's algorithm.`
+            : `Algorithm ${alg} is considered quantum-safe.`
+        });
+      } catch (err) {
+        alert('Failed to parse JWT. Ensure it is base64 encoded.');
+      } finally {
+        setIsAuditing(false);
+      }
+    }, 600);
   };
 
   return (
@@ -265,14 +283,17 @@ export const CryptoWorkbench: React.FC = () => {
                     <option key={key} value={key}>{ALGORITHMS[key].name}</option>
                   ))}
                 </select>
-                <button
+                <Button
                   onClick={handleGenerateKeys}
-                  disabled={isGenerating}
-                  className="bg-[#00C4E8] text-[#080C14] hover:bg-[#0096B4] disabled:opacity-50 transition font-semibold text-sm rounded-lg px-4 py-2.5 flex items-center gap-2"
+                  loading={isGenerating}
+                  loadingText="Generating..."
+                  flashSuccess={flashSuccess}
+                  icon={<RefreshCw size={16} />}
+                  variant="primary"
+                  size="medium"
                 >
-                  <RefreshCw size={16} className={isGenerating ? 'animate-spin' : ''} />
-                  {isGenerating ? 'Generating...' : 'Generate Keys'}
-                </button>
+                  Generate Keys
+                </Button>
               </div>
             </div>
 
@@ -309,6 +330,9 @@ export const CryptoWorkbench: React.FC = () => {
                   </div>
                 </div>
               </div>
+              <div className="text-[11px] text-[#94A3B8] leading-normal pt-1 border-t border-[#1E2D45]/30">
+                Larger key size is an expected tradeoff for post-quantum security — it does not indicate weaker protection.
+              </div>
             </div>
 
             {/* Generated Keys Display */}
@@ -326,13 +350,14 @@ export const CryptoWorkbench: React.FC = () => {
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-mono text-[#94A3B8]">Public Key</span>
-                        <button 
+                        <Button 
+                          variant="secondary"
+                          size="small"
+                          icon={copiedField === 'pub' ? <Check size={14} className="text-[#22C55E]" /> : <Copy size={14} />}
                           onClick={() => copyToClipboard(keys.pub, 'pub')}
-                          className="text-[#00C4E8] hover:text-[#0096B4] flex items-center gap-1 text-[11px] font-medium"
                         >
-                          {copiedField === 'pub' ? <Check size={12} /> : <Copy size={12} />}
                           {copiedField === 'pub' ? 'Copied' : 'Copy'}
-                        </button>
+                        </Button>
                       </div>
                       <div className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-3 font-mono text-[10px] text-[#94A3B8] h-24 overflow-y-auto whitespace-pre-wrap break-all">
                         {keys.pub}
@@ -342,16 +367,45 @@ export const CryptoWorkbench: React.FC = () => {
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-mono text-[#94A3B8]">Private Key</span>
-                        <button 
-                          onClick={() => copyToClipboard(keys.priv, 'priv')}
-                          className="text-[#00C4E8] hover:text-[#0096B4] flex items-center gap-1 text-[11px] font-medium"
-                        >
-                          {copiedField === 'priv' ? <Check size={12} /> : <Copy size={12} />}
-                          {copiedField === 'priv' ? 'Copied' : 'Copy'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {isPrivKeyRevealed && (
+                            <button
+                              onClick={() => setIsPrivKeyRevealed(false)}
+                              className="text-[12px] text-[#94A3B8] hover:text-[#E2E8F0] flex items-center gap-1 font-mono transition-colors"
+                            >
+                              <EyeOff size={12} />
+                              Hide
+                            </button>
+                          )}
+                          <Button 
+                            variant="secondary"
+                            size="small"
+                            icon={copiedField === 'priv' ? <Check size={14} className="text-[#22C55E]" /> : <Copy size={14} />}
+                            onClick={() => copyToClipboard(keys.priv, 'priv')}
+                          >
+                            {copiedField === 'priv' ? 'Copied' : 'Copy'}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-3 font-mono text-[10px] text-[#94A3B8] h-24 overflow-y-auto whitespace-pre-wrap break-all">
-                        {keys.priv}
+                      <div className="relative overflow-hidden rounded-lg">
+                        <div 
+                          className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-3 font-mono text-[10px] text-[#94A3B8] h-24 overflow-y-auto whitespace-pre-wrap break-all select-all transition-all duration-300"
+                          style={{ filter: isPrivKeyRevealed ? 'none' : 'blur(6px)' }}
+                        >
+                          {keys.priv}
+                        </div>
+                        {!isPrivKeyRevealed && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                            <Button
+                              variant="secondary"
+                              size="small"
+                              icon={<Eye size={16} />}
+                              onClick={() => setIsPrivKeyRevealed(true)}
+                            >
+                              Click to reveal
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>
@@ -395,6 +449,25 @@ export const CryptoWorkbench: React.FC = () => {
                 {ALGORITHMS[calcAlg].quantumSecurity}
               </span>
               <span className="text-[10px] text-[#475569] block mt-1">Shor's/Grover's Adjusted</span>
+              {ALGORITHMS[calcAlg].type === 'classical' ? (
+                <p className="text-[11px] text-[#94A3B8] mt-2 leading-relaxed text-left mx-auto max-w-[200px]">
+                  0 bits = fully broken, not weakened. Unlike Grover's algorithm, which
+                  halves symmetric key strength, Shor's algorithm breaks RSA and ECC
+                  completely in polynomial time — there is no partial security
+                  remaining.
+                </p>
+              ) : ALGORITHMS[calcAlg].type === 'pqc' ? (
+                <p className="text-[11px] text-[#94A3B8] mt-2 leading-relaxed text-left mx-auto max-w-[200px]">
+                  This algorithm's security margin against quantum attack is preserved
+                  because lattice-based hardness assumptions are not solved by Shor's
+                  or Grover's algorithms in polynomial time.
+                </p>
+              ) : (
+                <p className="text-[11px] text-[#94A3B8] mt-2 leading-relaxed text-left mx-auto max-w-[200px]">
+                  Symmetric key strength is quadratically reduced by Grover's search,
+                  effectively halving the key bits, but remains secure against total break.
+                </p>
+              )}
             </div>
           </div>
 
@@ -445,13 +518,21 @@ export const CryptoWorkbench: React.FC = () => {
                 className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-3 text-xs text-[#94A3B8] font-mono w-full h-32 focus:border-[#00C4E8] focus:outline-none focus:ring-1 focus:ring-[#00C4E8]"
                 placeholder="Paste JWT here..."
               ></textarea>
-              <button
+              <div className="text-[11px] text-[#475569] mt-0.5">
+                Demo token for illustration — generate your own JWTs to test live.
+              </div>
+              <Button
                 onClick={handleAuditJwt}
-                className="bg-[#00C4E8] text-[#080C14] hover:bg-[#0096B4] transition font-semibold text-xs rounded-lg px-4 py-2.5 w-full flex items-center justify-center gap-2"
+                disabled={!jwtInput.trim() || isAuditing}
+                loading={isAuditing}
+                loadingText="Auditing Signature..."
+                icon={<ScanSearch size={16} />}
+                variant="primary"
+                size="large"
+                fullWidth
               >
-                <Binary size={14} />
                 Audit Signature
-              </button>
+              </Button>
             </div>
 
             {/* Audit Output */}
