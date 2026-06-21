@@ -26,11 +26,14 @@ export function useAnalystChat() {
           finalizeStreamMessage(placeholderId, e, intentRef.current); 
           abortRef.current = null; 
           
+          const riskLevel = String(e.risk_level || "").toUpperCase();
+          console.log("AI Analyst stream done. Risk Level:", riskLevel);
+
           // Trigger security notification if risk level is CRITICAL or HIGH
-          if (e.risk_level === "CRITICAL" || e.risk_level === "HIGH") {
+          if (riskLevel === "CRITICAL" || riskLevel === "HIGH") {
             useNotificationStore.getState().addNotification({
               type: 'alert',
-              title: `Security Threat: ${e.risk_level} Risk`,
+              title: `Security Threat: ${riskLevel} Risk`,
               desc: `AI Analyst flagged a potential post-quantum vulnerability during query analysis.`,
               route: '/analyst'
             });
@@ -40,8 +43,15 @@ export function useAnalystChat() {
           markStreamError(placeholderId, error); 
           abortRef.current = null; 
           
+          const errorStr = String(error || "");
+          console.warn("AI Analyst Stream Error caught:", errorStr);
+
           // Trigger notification on prompt injection / security violation
-          if (error.includes("Security violation") || error.includes("Restricted input")) {
+          if (
+            errorStr.toLowerCase().includes("security violation") ||
+            errorStr.toLowerCase().includes("restricted input") ||
+            errorStr.toLowerCase().includes("prompt injection")
+          ) {
             useNotificationStore.getState().addNotification({
               type: 'alert',
               title: 'Prompt Injection Blocked',

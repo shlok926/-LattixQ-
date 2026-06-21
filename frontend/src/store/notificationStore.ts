@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface NotificationItem {
   id: number;
@@ -49,46 +50,54 @@ const playAlertSound = () => {
   }
 };
 
-export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: [
-    { id: 1, type: 'alert', title: 'Weak Key Found', desc: 'Server-4 uses legacy RSA-1024 parameters.', time: '10m ago', read: false, route: '/inventory' },
-    { id: 2, type: 'info', title: 'FIPS 203 Standardized', desc: 'ML-KEM-768 is officially standard.', time: '2h ago', read: false, route: '/playbook' },
-    { id: 3, type: 'success', title: 'Code Scan Complete', desc: 'Zero hardcoded keys in main-branch.', time: '1d ago', read: true, route: '/batch-scan' },
-  ],
-  unreadCount: 2,
-  addNotification: (notif) => {
-    const newItem: NotificationItem = {
-      id: Date.now(),
-      time: 'Just now',
-      read: false,
-      ...notif,
-    };
-    
-    if (newItem.type === 'alert' || newItem.type === 'warning') {
-      playAlertSound();
-    }
+export const useNotificationStore = create<NotificationState>()(
+  persist(
+    (set) => ({
+      notifications: [
+        { id: 1, type: 'alert', title: 'Weak Key Found', desc: 'Server-4 uses legacy RSA-1024 parameters.', time: '10m ago', read: false, route: '/inventory' },
+        { id: 2, type: 'info', title: 'FIPS 203 Standardized', desc: 'ML-KEM-768 is officially standard.', time: '2h ago', read: false, route: '/playbook' },
+        { id: 3, type: 'success', title: 'Code Scan Complete', desc: 'Zero hardcoded keys in main-branch.', time: '1d ago', read: true, route: '/batch-scan' },
+      ],
+      unreadCount: 2,
+      addNotification: (notif) => {
+        const newItem: NotificationItem = {
+          id: Date.now(),
+          time: 'Just now',
+          read: false,
+          ...notif,
+        };
+        
+        console.log("Triggered real-time notification in store:", newItem);
+        if (newItem.type === 'alert' || newItem.type === 'warning') {
+          playAlertSound();
+        }
 
-    set((state) => {
-      const updated = [newItem, ...state.notifications];
-      return {
-        notifications: updated,
-        unreadCount: updated.filter((n) => !n.read).length,
-      };
-    });
-  },
-  markAllAsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-      unreadCount: 0,
-    })),
-  markAsRead: (id) =>
-    set((state) => {
-      const updated = state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      );
-      return {
-        notifications: updated,
-        unreadCount: updated.filter((n) => !n.read).length,
-      };
+        set((state) => {
+          const updated = [newItem, ...state.notifications];
+          return {
+            notifications: updated,
+            unreadCount: updated.filter((n) => !n.read).length,
+          };
+        });
+      },
+      markAllAsRead: () =>
+        set((state) => ({
+          notifications: state.notifications.map((n) => ({ ...n, read: true })),
+          unreadCount: 0,
+        })),
+      markAsRead: (id) =>
+        set((state) => {
+          const updated = state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          );
+          return {
+            notifications: updated,
+            unreadCount: updated.filter((n) => !n.read).length,
+          };
+        }),
     }),
-}));
+    {
+      name: "qs-notification-store",
+    }
+  )
+);
