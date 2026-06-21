@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
-import { RadialBarChart, RadialBar, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
-import { AlertTriangle, Download, CheckSquare, Square, Shield, Check, Clock, TrendingUp } from 'lucide-react';
+import { RadialBarChart, RadialBar, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { 
+  AlertTriangle, Download, CheckSquare, Square, Shield, Check, Clock, TrendingUp,
+  ShieldQuestion, CheckCircle2, XCircle, CircleDashed, ChevronRight, ChevronDown 
+} from 'lucide-react';
 import AlgorithmBadge from '../../components/ui/AlgorithmBadge';
 import { api } from '../../services/api';
+
+interface Requirement {
+  status: 'yes' | 'no' | 'partial';
+  title: string;
+  detail: string;
+}
 
 export const ReportsPage: React.FC = () => {
   const [selectedAlgos, setSelectedAlgos] = useState<string[]>([
@@ -10,11 +19,15 @@ export const ReportsPage: React.FC = () => {
     'ECC-256',
     'AES-128'
   ]);
-  const [timeline, setTimeline] = useState<string>('10 years');
+  const [timeline, setTimeline] = useState<string>('15 years');
   const [format, setFormat] = useState<'PDF' | 'HTML'>('PDF');
-  const [isAssessing, setIsAssessing] = useState(false);
+  const [assessmentStatus, setAssessmentStatus] = useState<'idle' | 'running' | 'complete'>('idle');
+  const [runningStep, setRunningStep] = useState<number>(0);
+  const [lastAssessedTime, setLastAssessedTime] = useState<Date | null>(null);
+  const [configOutdated, setConfigOutdated] = useState<boolean>(false);
+  const [expandedCompliance, setExpandedCompliance] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [riskScore, setRiskScore] = useState<number>(74);
+  const [riskScore, setRiskScore] = useState<number>(40);
 
   // Toast States
   const [showToast, setShowToast] = useState(false);
@@ -26,18 +39,62 @@ export const ReportsPage: React.FC = () => {
     setTimeout(() => setShowToast(false), 3000);
   };
 
+  const [, setTick] = useState(0);
+  React.useEffect(() => {
+    if (!lastAssessedTime) return;
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [lastAssessedTime]);
+
+  const getLastAssessedText = () => {
+    if (!lastAssessedTime) return '';
+    const diffMs = new Date().getTime() - lastAssessedTime.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Assessed just now';
+    return `Last assessed: ${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+  };
+
   const toggleAlgo = (algo: string) => {
     if (selectedAlgos.includes(algo)) {
       setSelectedAlgos(selectedAlgos.filter((a) => a !== algo));
     } else {
       setSelectedAlgos([...selectedAlgos, algo]);
     }
+    if (assessmentStatus === 'complete') {
+      setConfigOutdated(true);
+    }
+  };
+
+  const handleTimelineChange = (t: string) => {
+    setTimeline(t);
+    if (assessmentStatus === 'complete') {
+      setConfigOutdated(true);
+    }
   };
 
   const handleRunAssessment = () => {
-    setIsAssessing(true);
+    setAssessmentStatus('running');
+    setRunningStep(1);
+    
     setTimeout(() => {
-      setIsAssessing(false);
+      setRunningStep(2);
+    }, 750);
+    
+    setTimeout(() => {
+      setRunningStep(3);
+    }, 1500);
+    
+    setTimeout(() => {
+      setRunningStep(4);
+    }, 2250);
+    
+    setTimeout(() => {
+      setAssessmentStatus('complete');
+      setLastAssessedTime(new Date());
+      setConfigOutdated(false);
+      
       // Simulate dynamic risk calculation based on selection
       let score = 0;
       if (selectedAlgos.includes('RSA-2048')) score += 40;
@@ -48,15 +105,109 @@ export const ReportsPage: React.FC = () => {
       if (selectedAlgos.includes('CRYSTALS-Dilithium3')) score -= 10;
       setRiskScore(Math.max(0, Math.min(100, score + 10)));
       triggerToast("Risk assessment models recalculated!");
-    }, 1000);
+    }, 3000);
   };
 
-  // Compliance Metrics
-  const nistCompliant = selectedAlgos.includes('CRYSTALS-Kyber-768') || selectedAlgos.includes('CRYSTALS-Dilithium3');
-  const cnsaCompliant = !selectedAlgos.includes('RSA-2048') && !selectedAlgos.includes('ECC-256') && (selectedAlgos.includes('CRYSTALS-Kyber-768') || selectedAlgos.includes('CRYSTALS-Dilithium3'));
-  const gdprReady = selectedAlgos.includes('AES-256') && (selectedAlgos.includes('CRYSTALS-Kyber-768') || selectedAlgos.includes('CRYSTALS-Dilithium3'));
+  // Compliance Metrics dynamic details
+  const getFrameworkRequirements = (frameworkId: string): Requirement[] => {
+    const reqs: Requirement[] = [];
+    
+    if (frameworkId === 'nist') {
+      reqs.push({
+        status: selectedAlgos.length > 0 ? 'yes' : 'partial',
+        title: 'Cryptographic discovery and inventory completed',
+        detail: `${selectedAlgos.length} algorithm${selectedAlgos.length !== 1 ? 's' : ''} identified and catalogued`
+      });
+      reqs.push({
+        status: selectedAlgos.length > 0 ? 'yes' : 'no',
+        title: 'Risk-based migration prioritization documented',
+        detail: selectedAlgos.length > 0 ? 'Risk scoring applied across all inventoried algorithms' : 'No algorithms found to document risk'
+      });
+      reqs.push({
+        status: 'yes',
+        title: 'Migration roadmap established',
+        detail: 'Timeline horizon configured for assessment'
+      });
+    } else if (frameworkId === 'cnsa') {
+      const hasPqcKem = selectedAlgos.includes('CRYSTALS-Kyber-768');
+      const hasLegacyAsym = selectedAlgos.includes('RSA-2048') || selectedAlgos.includes('ECC-256');
+      reqs.push({
+        status: hasPqcKem ? 'yes' : 'no',
+        title: 'Key establishment uses NIST-approved post-quantum algorithm',
+        detail: hasLegacyAsym 
+          ? 'RSA-2048/ECC-256 detected — CNSA 2.0 requires ML-KEM-768 or higher by 2027'
+          : (hasPqcKem ? 'ML-KEM-768 available in configuration' : 'No KEM algorithm selected in configuration')
+      });
+      
+      const hasPqcSig = selectedAlgos.includes('CRYSTALS-Dilithium3');
+      reqs.push({
+        status: hasPqcSig ? 'yes' : 'no',
+        title: 'Digital signatures use NIST-approved post-quantum algorithm',
+        detail: hasPqcSig
+          ? 'ML-DSA / SLH-DSA signature model available'
+          : 'No ML-DSA or SLH-DSA signature algorithm detected in configuration'
+      });
 
-  // Horizon Data for Line/Area chart
+      const hasAes256 = selectedAlgos.includes('AES-256');
+      reqs.push({
+        status: hasAes256 ? 'yes' : 'partial',
+        title: 'Symmetric encryption meets minimum key length',
+        detail: hasAes256 
+          ? 'AES-256 available in configuration' 
+          : 'AES-128 detected — AES-256 is recommended for maximum security'
+      });
+
+      const isHybrid = hasPqcKem && hasLegacyAsym;
+      reqs.push({
+        status: isHybrid ? 'yes' : 'partial',
+        title: 'Hybrid transition period requirements',
+        detail: isHybrid
+          ? 'Hybrid key exchange configured for transition'
+          : 'Hybrid key exchange not yet configured — required for interim compliance'
+      });
+    } else if (frameworkId === 'gdpr') {
+      const hasLegacyAsym = selectedAlgos.includes('RSA-2048') || selectedAlgos.includes('ECC-256');
+      reqs.push({
+        status: !hasLegacyAsym ? 'yes' : 'no',
+        title: 'Long-term personal data protection against future decryption',
+        detail: hasLegacyAsym
+          ? 'RSA-2048 key exchange vulnerable to harvest-now-decrypt-later risk'
+          : 'Legacy endpoints migrated to post-quantum keys'
+      });
+
+      const years = timeline.includes('5') ? 5 : timeline.includes('10') ? 10 : timeline.includes('15') ? 15 : 25;
+      reqs.push({
+        status: years >= 15 ? 'partial' : 'yes',
+        title: 'Data retention period assessed against quantum threat timeline',
+        detail: `${years}-year horizon configured — review recommended given RSA-2048 usage`
+      });
+
+      const hasAes256 = selectedAlgos.includes('AES-256');
+      reqs.push({
+        status: hasAes256 ? 'yes' : 'no',
+        title: 'Encryption-at-rest meets current data protection standards',
+        detail: hasAes256 ? 'AES-256 available in configuration' : 'Symmetric encryption weak or unselected'
+      });
+    }
+    
+    return reqs;
+  };
+
+  const getFrameworkStatus = (frameworkId: string): 'COMPLIANT' | 'PARTIAL' | 'NON-READY' => {
+    const reqs = getFrameworkRequirements(frameworkId);
+    const hasNo = reqs.some(r => r.status === 'no');
+    const hasPartial = reqs.some(r => r.status === 'partial');
+    
+    if (hasNo) return 'NON-READY';
+    if (hasPartial) return 'PARTIAL';
+    return 'COMPLIANT';
+  };
+
+  const nistCompliant = getFrameworkStatus('nist') === 'COMPLIANT';
+  const cnsaCompliant = getFrameworkStatus('cnsa') === 'COMPLIANT';
+  const gdprReady = getFrameworkStatus('gdpr') === 'COMPLIANT';
+
+  // Horizon Data for stacked complementary Area chart
   const generateTimelineData = () => {
     const yearsCount = timeline === '5 years' ? 5 : timeline === '10 years' ? 10 : timeline === '15 years' ? 15 : 25;
     const data = [];
@@ -66,20 +217,45 @@ export const ReportsPage: React.FC = () => {
       let riskVal = 0;
       if (isLegacyActive) {
         const legacyWeight = (selectedAlgos.includes('RSA-2048') ? 45 : 0) + (selectedAlgos.includes('ECC-256') ? 35 : 0) + (selectedAlgos.includes('AES-128') ? 15 : 0);
-        riskVal = Math.round(legacyWeight * (1 - Math.exp(-0.15 * i)) + 5);
+        riskVal = Math.round(legacyWeight * (1 - Math.exp(-0.12 * i)) + 5);
       } else {
-        riskVal = Math.max(2, 5 - i * 0.1);
+        riskVal = Math.max(1, 3 - i * 0.1);
       }
+      
+      const decryptionRisk = Math.min(100, Math.max(0, Math.round(riskVal)));
+      const safeConfidence = Math.max(0, 100 - decryptionRisk);
+      
       data.push({
         year: `Yr ${i}`,
-        Risk: Math.min(100, Math.max(0, Math.round(riskVal))),
-        Protection: Math.min(100, Math.max(0, Math.round(100 - riskVal)))
+        yearNum: i,
+        decryptionRisk,
+        safeConfidence
       });
     }
     return data;
   };
 
   const timelineData = generateTimelineData();
+
+  const getCrossoverPoint = () => {
+    const crossover = timelineData.find(d => d.decryptionRisk >= 50);
+    return crossover ? crossover.year : null;
+  };
+  const crossoverYear = getCrossoverPoint();
+
+  const getPlainEnglishSummary = () => {
+    const finalYearData = timelineData[timelineData.length - 1];
+    const finalRisk = finalYearData ? finalYearData.decryptionRisk : 0;
+    const totalYears = timeline === '5 years' ? 5 : timeline === '10 years' ? 10 : timeline === '15 years' ? 15 : 25;
+    
+    if (finalRisk >= 50) {
+      const crossover = timelineData.find(d => d.decryptionRisk >= 50);
+      const crossoverYrNum = crossover ? crossover.yearNum : 5;
+      return `Based on your current configuration, data encrypted today has a ${finalRisk}% chance of being decrypted by a quantum computer within ${totalYears} years (with risk exceeding safe confidence at Year ${crossoverYrNum}).`;
+    } else {
+      return `Based on your current configuration, data encrypted today remains highly secure, maintaining a ${100 - finalRisk}% quantum-safe confidence level over a ${totalYears}-year horizon.`;
+    }
+  };
 
   const riskColor = riskScore > 60 ? '#EF4444' : riskScore > 30 ? '#F59E0B' : '#22C55E';
   const riskData = [{ name: 'Risk', value: riskScore, fill: riskColor }];
@@ -141,7 +317,6 @@ export const ReportsPage: React.FC = () => {
     }
   ];
 
-  // Real browser-side download of generated reports
   const handleDownload = async (formatType: 'PDF' | 'HTML') => {
     const reportTitle = `QUANTUMSHIELD CRYPTOGRAPHIC COMPLIANCE BLUEPRINT`;
     const dateStr = new Date().toLocaleDateString();
@@ -164,7 +339,7 @@ export const ReportsPage: React.FC = () => {
             { algorithm: "CRYSTALS-Dilithium3", category: "Signature", keygen_ms: 0.38, encrypt_ms: 1.24, peak_memory_kb: 4.8 }
           ],
           ai_enrichment: {
-            readiness_score: 100 - riskScore, // convert risk to readiness
+            readiness_score: 100 - riskScore,
             findings: findings.filter(f => f.show).map((f, i) => ({
               id: i + 1,
               technology: f.name,
@@ -216,7 +391,6 @@ export const ReportsPage: React.FC = () => {
         console.error("Failed to generate PDF:", err);
         triggerToast("Failed to generate PDF. Falling back to TXT...");
         
-        // Fallback to plain text
         const content = `========================================================================
 ${reportTitle}
 ========================================================================
@@ -375,7 +549,7 @@ COMPLIANCE STANDARD MATURITY:
                 {['5 years', '10 years', '15 years', '25 years'].map((t) => (
                   <button
                     key={t}
-                    onClick={() => setTimeline(t)}
+                    onClick={() => handleTimelineChange(t)}
                     className={`py-1.5 text-[10px] font-bold rounded transition-all whitespace-nowrap ${
                       timeline === t
                         ? 'bg-[#1E2D45] text-[#00C4E8]'
@@ -412,13 +586,17 @@ COMPLIANCE STANDARD MATURITY:
 
           <button
             onClick={handleRunAssessment}
-            disabled={isAssessing}
-            className="w-full bg-[#00C4E8] hover:bg-[#0096B4] text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 mt-6"
+            disabled={assessmentStatus === 'running'}
+            className={`w-full text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 mt-6 ${
+              assessmentStatus === 'running'
+                ? 'bg-[#00C4E8] opacity-70 cursor-not-allowed'
+                : 'bg-[#00C4E8] hover:bg-[#0096B4]'
+            }`}
           >
-            {isAssessing ? (
+            {assessmentStatus === 'running' ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-[#080C14] border-t-transparent rounded-full animate-spin" />
-                Assessing Risk...
+                Running Assessment...
               </>
             ) : (
               'Run Assessment'
@@ -427,191 +605,357 @@ COMPLIANCE STANDARD MATURITY:
         </div>
 
         {/* Right panel (60% width) — Results */}
-        <div className="lg:col-span-6 space-y-6">
-          
-          {/* Top Panel: Risk Score Gauge and Compliance Status */}
-          <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 relative min-h-[220px]">
-            {isAssessing && (
-              <div className="absolute inset-0 bg-[#0D1421]/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-2 rounded-xl">
-                <span className="w-8 h-8 border-4 border-[#00C4E8] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[13px] text-[#94A3B8] font-mono">Running compliance assessment rules...</span>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Circular Gauge */}
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest self-start mb-2">calculated risk score</span>
-                <div className="relative w-full h-[130px] flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart
-                      cx="50%"
-                      cy="50%"
-                      innerRadius="80%"
-                      outerRadius="100%"
-                      barSize={10}
-                      data={riskData}
-                      startAngle={225}
-                      endAngle={-45}
-                    >
-                      <RadialBar
-                        background={{ fill: 'rgba(255,255,255,0.03)' }}
-                        dataKey="value"
-                        cornerRadius={5}
-                      />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                  <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-4xl font-black font-mono" style={{ color: riskColor }}>
-                      {riskScore}
-                    </span>
-                    <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
-                      out of 100
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Compliance Benchmarks Status */}
-              <div className="flex flex-col justify-center space-y-3">
-                <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest">compliance blueprints</span>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 bg-[#080C14] border border-[#1E2D45] rounded-lg">
-                    <span className="text-xs text-slate-300 font-medium">NIST SP 800-219</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                      nistCompliant 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                        : 'bg-red-500/10 text-red-400 border-red-500/20'
-                    }`}>
-                      {nistCompliant ? 'COMPLIANT' : 'NON-READY'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 bg-[#080C14] border border-[#1E2D45] rounded-lg">
-                    <span className="text-xs text-slate-300 font-medium">NSA CNSA 2.0</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                      cnsaCompliant 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                        : 'bg-red-500/10 text-red-400 border-red-500/20'
-                    }`}>
-                      {cnsaCompliant ? 'COMPLIANT' : 'NON-READY'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 bg-[#080C14] border border-[#1E2D45] rounded-lg">
-                    <span className="text-xs text-slate-300 font-medium">GDPR PQC Clause</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                      gdprReady 
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                        : 'bg-red-500/10 text-red-400 border-red-500/20'
-                    }`}>
-                      {gdprReady ? 'COMPLIANT' : 'NON-READY'}
-                    </span>
-                  </div>
-                </div>
+        <div className="lg:col-span-6 space-y-6 flex flex-col justify-between min-h-[580px]">
+          {assessmentStatus === 'idle' && (
+            <div className="flex-1 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-8 flex flex-col items-center justify-center text-center">
+              <ShieldQuestion size={56} className="text-[#1E2D45]" />
+              <h3 className="text-base font-semibold text-[#E2E8F0] mt-4">No assessment run yet</h3>
+              <p className="text-xs text-[#94A3B8] mt-2 max-w-sm leading-relaxed">
+                Select your cryptographic configuration and timeline on the left, then click Run Assessment to generate your risk score, compliance status, and migration recommendations.
+              </p>
+              <div className="flex items-center gap-1.5 mt-6 text-[#475569] text-[11px] font-medium">
+                <Clock size={12} />
+                <span>Takes about 3 seconds</span>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Middle Panel: Dynamic Area Chart for Threat Horizon */}
-          <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5">
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-[#00C4E8]" />
-                  HNDL Exposure Horizon Projection
-                </h4>
-                <p className="text-[10px] text-[#475569] mt-0.5">Simulated probability curve of data capture and Shor decryption over {timeline}</p>
+          {assessmentStatus === 'running' && (
+            <div className="flex-1 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-8 flex flex-col items-center justify-center">
+              <div className="relative flex items-center justify-center mb-4">
+                <span className="w-12 h-12 border-4 border-[#00C4E8] border-t-transparent rounded-full animate-spin" />
+                <Shield size={20} className="absolute text-[#00C4E8] animate-pulse" />
               </div>
-            </div>
-            
-            <div className="h-[140px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0}/>
-                    </linearGradient>
-                    <linearGradient id="colorProtection" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22C55E" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#22C55E" stopOpacity={0.0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="year" stroke="#475569" fontSize={9} tickLine={false} />
-                  <YAxis stroke="#475569" fontSize={9} tickLine={false} domain={[0, 100]} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#080C14', borderColor: '#1E2D45', borderRadius: '8px' }}
-                    labelStyle={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}
-                    itemStyle={{ fontSize: '11px', color: '#fff' }}
-                  />
-                  <Area type="monotone" dataKey="Risk" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorRisk)" name="Threat Risk %" />
-                  <Area type="monotone" dataKey="Protection" stroke="#22C55E" strokeWidth={2} fillOpacity={1} fill="url(#colorProtection)" name="Immunity %" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Bottom Panel: Findings List & Download triggers */}
-          <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[200px]">
-            <div>
-              <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest block mb-3">vulnerability indicators</span>
+              <h3 className="text-base font-semibold text-[#E2E8F0]">Running assessment...</h3>
               
-              <div className="overflow-y-auto max-h-[140px] pr-1 space-y-2 scrollbar-thin">
-                {findings.filter(f => f.show).map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`${item.colorBorder} bg-[#080C14]/65 border border-[#1E2D45]/40 rounded-r-lg p-2.5 flex flex-col gap-1 transition-all hover:bg-[#1A2540]/30`}
+              <div className="mt-8 space-y-4 w-full max-w-xs">
+                {[
+                  { id: 1, text: 'Evaluating cryptographic configuration' },
+                  { id: 2, text: 'Calculating quantum vulnerability scores' },
+                  { id: 3, text: 'Checking compliance framework alignment' },
+                  { id: 4, text: 'Generating HNDL exposure projection' }
+                ].map((step) => {
+                  const isDone = runningStep > step.id;
+                  const isCurrent = runningStep === step.id;
+                  return (
+                    <div key={step.id} className="flex items-center gap-3">
+                      {isDone ? (
+                        <CheckCircle2 size={16} className="text-[#22C55E] shrink-0" />
+                      ) : isCurrent ? (
+                        <span className="w-4 h-4 border-2 border-[#00C4E8] border-t-transparent rounded-full animate-spin shrink-0" />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full border-2 border-[#475569] shrink-0" />
+                      )}
+                      <span className={`text-[13px] ${isDone ? 'text-[#94A3B8]' : isCurrent ? 'text-[#E2E8F0] font-medium' : 'text-[#475569]'}`}>
+                        {step.text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {assessmentStatus === 'complete' && (
+            <>
+              {configOutdated && (
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-4 py-2.5 rounded-xl flex items-center justify-between text-[13px] animate-fadeIn shrink-0">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={15} className="text-amber-400 shrink-0" />
+                    <span>Configuration changed — results may be outdated</span>
+                  </div>
+                  <button 
+                    onClick={handleRunAssessment}
+                    className="text-[12px] font-bold text-[#00C4E8] hover:underline bg-transparent border-0 cursor-pointer"
                   >
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-white font-mono">{item.name}</span>
-                        <span className="text-[9px] text-[#475569] uppercase font-mono mt-0.5">{item.type}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 font-mono">Risk Index: {item.risk}</span>
-                        <AlgorithmBadge status={item.status} />
+                    Re-run Assessment
+                  </button>
+                </div>
+              )}
+
+              {/* Top Panel: Risk Score Gauge and Compliance Status */}
+              <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 relative min-h-[220px]">
+                {lastAssessedTime && (
+                  <div className="absolute top-4 right-5 text-[10px] text-[#475569] font-mono">
+                    {getLastAssessedText()}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Circular Gauge */}
+                  <div className="flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest self-start mb-2">calculated risk score</span>
+                    <div className="relative w-full h-[130px] flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadialBarChart
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="80%"
+                          outerRadius="100%"
+                          barSize={10}
+                          data={riskData}
+                          startAngle={225}
+                          endAngle={-45}
+                        >
+                          <RadialBar
+                            background={{ fill: 'rgba(255,255,255,0.03)' }}
+                            dataKey="value"
+                            cornerRadius={5}
+                          />
+                        </RadialBarChart>
+                      </ResponsiveContainer>
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-4xl font-black font-mono" style={{ color: riskColor }}>
+                          {riskScore}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
+                          out of 100
+                        </span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-[#94A3B8] font-medium italic">
-                      Recom: {item.recommendation}
-                    </p>
                   </div>
-                ))}
-                {selectedAlgos.length === 0 && (
-                  <div className="flex items-center justify-center text-[12px] text-[#475569] font-mono py-8">
-                    No algorithms selected for evaluation.
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Export Buttons */}
-            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#1E2D45]/45">
-              <button 
-                onClick={() => handleDownload('PDF')}
-                disabled={isDownloading}
-                className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isDownloading ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <Download size={13} /> Download Report (PDF)
-                  </>
-                )}
-              </button>
-              <button 
-                onClick={() => handleDownload('HTML')}
-                className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer"
-              >
-                <Download size={13} /> Download HTML
-              </button>
-            </div>
+                  {/* Compliance Benchmarks Status Accordion */}
+                  <div className="flex flex-col justify-center space-y-3">
+                    <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest">compliance blueprints</span>
+                    
+                    <div className="space-y-2">
+                      {[
+                        { id: 'nist', label: 'NIST SP 800-219' },
+                        { id: 'cnsa', label: 'NSA CNSA 2.0' },
+                        { id: 'gdpr', label: 'GDPR PQC Clause' }
+                      ].map((fw) => {
+                        const status = getFrameworkStatus(fw.id);
+                        const reqs = getFrameworkRequirements(fw.id);
+                        const isExpanded = expandedCompliance === fw.id;
+                        
+                        return (
+                          <div 
+                            key={fw.id}
+                            className="border border-[#1E2D45] rounded-lg bg-[#080C14] transition-all overflow-hidden"
+                          >
+                            <button
+                              onClick={() => setExpandedCompliance(isExpanded ? null : fw.id)}
+                              className="w-full flex items-center justify-between p-2 text-left hover:bg-[#1A2540]/30 transition-colors select-none"
+                            >
+                              <span className="text-xs text-slate-300 font-medium">{fw.label}</span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  status === 'COMPLIANT' 
+                                    ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                    : status === 'PARTIAL'
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                }`}>
+                                  {status}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronDown size={14} className="text-[#475569]" />
+                                ) : (
+                                  <ChevronRight size={14} className="text-[#475569]" />
+                                )}
+                              </div>
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="px-3 pb-3 border-t border-[#1E2D45] bg-[#090F1B]">
+                                <span className="text-[9px] font-bold text-[#475569] uppercase tracking-wider block mt-3 mb-2">Requirements</span>
+                                <div className="space-y-3">
+                                  {reqs.map((req, rIdx) => (
+                                    <div key={rIdx} className="flex gap-2.5 items-start">
+                                      {req.status === 'yes' ? (
+                                        <CheckCircle2 size={15} className="text-[#22C55E] shrink-0 mt-0.5" />
+                                      ) : req.status === 'no' ? (
+                                        <XCircle size={15} className="text-[#EF4444] shrink-0 mt-0.5" />
+                                      ) : (
+                                        <CircleDashed size={15} className="text-[#F59E0B] shrink-0 mt-0.5" />
+                                      )}
+                                      <div className="flex flex-col">
+                                        <span className="text-[11px] text-slate-300 font-medium leading-tight">{req.title}</span>
+                                        <span className="text-[10px] text-[#94A3B8] mt-0.5">{req.detail}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                
+                                <div className="mt-4 pt-3 border-t border-[#1E2D45]/50 flex justify-end">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      triggerToast("Redirecting to compliance framework documentation...");
+                                    }}
+                                    className="text-[11px] text-[#00C4E8] hover:underline bg-transparent border-0 p-0 cursor-pointer font-semibold"
+                                  >
+                                    View full compliance documentation &rarr;
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Panel: Dynamic Area Chart for Threat Horizon */}
+              <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <TrendingUp size={14} className="text-[#00C4E8]" />
+                      HNDL Exposure Horizon Projection
+                    </h4>
+                    <p className="text-[10px] text-[#475569] mt-0.5">Simulated probability curve of data capture and Shor decryption over {timeline}</p>
+                    
+                    {/* Legend Row */}
+                    <div className="flex items-center gap-4 mt-2 select-none">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#22C55E]" />
+                        <span className="text-[10px] text-[#94A3B8]">Quantum-Safe Confidence</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#EF4444]" />
+                        <span className="text-[10px] text-[#94A3B8]">Cumulative Decryption Risk</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="h-[140px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={timelineData} margin={{ top: 10, right: 5, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0.0}/>
+                        </linearGradient>
+                        <linearGradient id="colorProtection" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22C55E" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#22C55E" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="year" stroke="#475569" fontSize={9} tickLine={false} />
+                      <YAxis 
+                        stroke="#475569" 
+                        fontSize={9} 
+                        tickLine={false} 
+                        domain={[0, 100]} 
+                        tickFormatter={(val) => `${val}%`}
+                        label={{ value: 'Probability (%)', angle: -90, position: 'insideLeft', offset: -5, fill: '#475569', fontSize: 10, fontWeight: 'bold' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#080C14', borderColor: '#1E2D45', borderRadius: '8px' }}
+                        labelStyle={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}
+                        itemStyle={{ fontSize: '11px', color: '#fff' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="safeConfidence" 
+                        stackId="1" 
+                        stroke="#22C55E" 
+                        strokeWidth={2} 
+                        fillOpacity={0.3} 
+                        fill="url(#colorProtection)" 
+                        name="Quantum-Safe Confidence" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="decryptionRisk" 
+                        stackId="1" 
+                        stroke="#EF4444" 
+                        strokeWidth={2} 
+                        fillOpacity={0.3} 
+                        fill="url(#colorRisk)" 
+                        name="Cumulative Decryption Risk" 
+                      />
+                      {crossoverYear && (
+                        <ReferenceLine 
+                          x={crossoverYear} 
+                          stroke="#F59E0B" 
+                          strokeDasharray="4 4"
+                          label={{ 
+                            value: 'Risk exceeds safe confidence', 
+                            position: 'top', 
+                            fill: '#F59E0B', 
+                            fontSize: 9, 
+                            fontWeight: 'bold' 
+                          }} 
+                        />
+                      )}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Plain English Summary */}
+                <p className="text-[11px] text-[#94A3B8] mt-3 leading-relaxed border-t border-[#1E2D45]/40 pt-3">
+                  {getPlainEnglishSummary()}
+                </p>
+              </div>
+
+              {/* Bottom Panel: Findings List */}
+              <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[200px]">
+                <div>
+                  <span className="text-[10px] font-bold text-[#475569] uppercase tracking-widest block mb-3">vulnerability indicators</span>
+                  
+                  <div className="overflow-y-auto max-h-[140px] pr-1 space-y-2 scrollbar-thin">
+                    {findings.filter(f => f.show).map((item, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`${item.colorBorder} bg-[#080C14]/65 border border-[#1E2D45]/40 rounded-r-lg p-2.5 flex flex-col gap-1 transition-all hover:bg-[#1A2540]/30`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-white font-mono">{item.name}</span>
+                            <span className="text-[9px] text-[#475569] uppercase font-mono mt-0.5">{item.type}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 font-mono">Risk Index: {item.risk}</span>
+                            <AlgorithmBadge status={item.status} />
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#94A3B8] font-medium italic">
+                          Recom: {item.recommendation}
+                        </p>
+                      </div>
+                    ))}
+                    {selectedAlgos.length === 0 && (
+                      <div className="flex items-center justify-center text-[12px] text-[#475569] font-mono py-8">
+                        No algorithms selected for evaluation.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Export Buttons */}
+          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#1E2D45]/45">
+            <button 
+              onClick={() => handleDownload('PDF')}
+              disabled={assessmentStatus !== 'complete' || isDownloading}
+              className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isDownloading ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download size={13} /> Download Report (PDF)
+                </>
+              )}
+            </button>
+            <button 
+              onClick={() => handleDownload('HTML')}
+              disabled={assessmentStatus !== 'complete'}
+              className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download size={13} /> Download HTML
+            </button>
           </div>
 
         </div>
