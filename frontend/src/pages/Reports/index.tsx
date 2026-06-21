@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RadialBarChart, RadialBar, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { AlertTriangle, Download, CheckSquare, Square, Shield, Check, Clock, TrendingUp } from 'lucide-react';
 import AlgorithmBadge from '../../components/ui/AlgorithmBadge';
+import { api } from '../../services/api';
 
 export const ReportsPage: React.FC = () => {
   const [selectedAlgos, setSelectedAlgos] = useState<string[]>([
@@ -12,6 +13,7 @@ export const ReportsPage: React.FC = () => {
   const [timeline, setTimeline] = useState<string>('10 years');
   const [format, setFormat] = useState<'PDF' | 'HTML'>('PDF');
   const [isAssessing, setIsAssessing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [riskScore, setRiskScore] = useState<number>(74);
 
   // Toast States
@@ -140,13 +142,125 @@ export const ReportsPage: React.FC = () => {
   ];
 
   // Real browser-side download of generated reports
-  const handleDownload = (formatType: 'PDF' | 'HTML') => {
+  const handleDownload = async (formatType: 'PDF' | 'HTML') => {
     const reportTitle = `QUANTUMSHIELD CRYPTOGRAPHIC COMPLIANCE BLUEPRINT`;
     const dateStr = new Date().toLocaleDateString();
-    
-    let content = "";
-    if (formatType === 'HTML') {
-      content = `<!DOCTYPE html>
+
+    if (formatType === 'PDF') {
+      setIsDownloading(true);
+      try {
+        const payload = {
+          system_info: {
+            name: "QuantumShield Primary Assessment",
+            files_scanned: 1,
+            algorithms: selectedAlgos.map(algo => ({
+              algorithm: algo,
+              key_size: algo.includes('2048') ? 2048 : (algo.includes('256') ? 256 : 128)
+            }))
+          },
+          sim_data: [],
+          bench_data: [
+            { algorithm: "CRYSTALS-Kyber-768", category: "KEM", keygen_ms: 0.07, encrypt_ms: 0.11, peak_memory_kb: 1.2 },
+            { algorithm: "CRYSTALS-Dilithium3", category: "Signature", keygen_ms: 0.38, encrypt_ms: 1.24, peak_memory_kb: 4.8 }
+          ],
+          ai_enrichment: {
+            readiness_score: 100 - riskScore, // convert risk to readiness
+            findings: findings.filter(f => f.show).map((f, i) => ({
+              id: i + 1,
+              technology: f.name,
+              risk: f.status === 'QUANTUM-VULNERABLE' ? 'Critical' : (f.status === 'PARTIALLY-AFFECTED' ? 'Medium' : 'Low'),
+              line: i * 12 + 4,
+              content: `import ${f.name.split('-')[0].toLowerCase()}`,
+              suggestion: f.recommendation
+            })),
+            roadmap: {
+              summary: `Security readiness is calculated at ${100 - riskScore}/100. Follow the phased mitigation blueprint below to transition legacy endpoints to post-quantum standards.`,
+              phases: [
+                {
+                  name: "Discovery & Inventory Mapping",
+                  duration: "Months 1-3",
+                  tasks: [
+                    "Execute automated scan of all network segments for legacy cryptography endpoints.",
+                    "Identify and document all active certificates containing RSA or ECC public keys."
+                  ]
+                },
+                {
+                  name: "Hybrid Algorithm Integration",
+                  duration: "Months 3-6",
+                  tasks: [
+                    "Configure dual-mode key exchanges on external APIs using X25519 + ML-KEM-768.",
+                    "Deploy ML-DSA certificates in shadow verification mode."
+                  ]
+                }
+              ]
+            }
+          }
+        };
+
+        const res = await api.post(
+          '/report/generate/pdf',
+          payload,
+          { responseType: 'blob' }
+        );
+
+        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.setAttribute('download', `QuantumShield_Assessment_Report_${dateStr.replace(/\//g, '_')}.pdf`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        triggerToast("Downloaded compliance assessment report as PDF!");
+      } catch (err) {
+        console.error("Failed to generate PDF:", err);
+        triggerToast("Failed to generate PDF. Falling back to TXT...");
+        
+        // Fallback to plain text
+        const content = `========================================================================
+${reportTitle}
+========================================================================
+Generated On: ${dateStr}
+Timeline Horizon Projection: ${timeline}
+Calculated Risk Index: ${riskScore} / 100
+Security Status: ${riskScore > 60 ? 'HIGH QUANTUM EXPOSURE' : riskScore > 30 ? 'MODERATE WARNING' : 'SECURE & QUANTUM-IMMUNE'}
+
+------------------------------------------------------------------------
+CRYPTOGRAPHIC ASSET INVENTORY & AUDIT:
+------------------------------------------------------------------------
+${findings.filter(f => f.show).map(f => `
+* Algorithm: ${f.name}
+  Type: ${f.type}
+  Security Status: ${f.status}
+  Risk Index: ${f.risk}/100
+  Mitigation Action: ${f.recommendation}
+`).join('\n')}
+
+------------------------------------------------------------------------
+COMPLIANCE STANDARD MATURITY:
+------------------------------------------------------------------------
+* NIST SP 800-219 PQC Migration Plan: ${nistCompliant ? 'COMPLIANT (Active Transition)' : 'NON-COMPLIANT (Vulnerable)'}
+* NSA CNSA 2.0 Standard: ${cnsaCompliant ? 'COMPLIANT (Clean PQC Parameters)' : 'NON-COMPLIANT (Legacy RSA/ECC active)'}
+* GDPR Post-Quantum Readiness: ${gdprReady ? 'COMPLIANT (AES-256 + Kyber)' : 'NON-COMPLIANT (Entropy below 192 bits)'}
+
+========================================================================
+                   Generated by QuantumShield Enterprise
+========================================================================
+`;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `QuantumShield_Assessment_Report_${dateStr.replace(/\//g, '_')}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } finally {
+        setIsDownloading(false);
+      }
+    } else {
+      const content = `<!DOCTYPE html>
 <html>
 <head>
   <title>QuantumShield Cryptographic Assessment</title>
@@ -184,50 +298,17 @@ export const ReportsPage: React.FC = () => {
   <div class="footer">QuantumShield Security SaaS Platform. All Rights Reserved.</div>
 </body>
 </html>`;
-    } else {
-      // Styled text layout (PDF simulation)
-      content = `========================================================================
-${reportTitle}
-========================================================================
-Generated On: ${dateStr}
-Timeline Horizon Projection: ${timeline}
-Calculated Risk Index: ${riskScore} / 100
-Security Status: ${riskScore > 60 ? 'HIGH QUANTUM EXPOSURE' : riskScore > 30 ? 'MODERATE WARNING' : 'SECURE & QUANTUM-IMMUNE'}
-
-------------------------------------------------------------------------
-CRYPTOGRAPHIC ASSET INVENTORY & AUDIT:
-------------------------------------------------------------------------
-${findings.filter(f => f.show).map(f => `
-* Algorithm: ${f.name}
-  Type: ${f.type}
-  Security Status: ${f.status}
-  Risk Index: ${f.risk}/100
-  Mitigation Action: ${f.recommendation}
-`).join('\n')}
-
-------------------------------------------------------------------------
-COMPLIANCE STANDARD MATURITY:
-------------------------------------------------------------------------
-* NIST SP 800-219 PQC Migration Plan: ${nistCompliant ? 'COMPLIANT (Active Transition)' : 'NON-COMPLIANT (Vulnerable)'}
-* NSA CNSA 2.0 Standard: ${cnsaCompliant ? 'COMPLIANT (Clean PQC Parameters)' : 'NON-COMPLIANT (Legacy RSA/ECC active)'}
-* GDPR Post-Quantum Readiness: ${gdprReady ? 'COMPLIANT (AES-256 + Kyber)' : 'NON-COMPLIANT (Entropy below 192 bits)'}
-
-========================================================================
-                   Generated by QuantumShield Enterprise
-========================================================================
-`;
+      const blob = new Blob([content], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `QuantumShield_Assessment_Report_${dateStr.replace(/\//g, '_')}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      triggerToast(`Downloaded compliance assessment as HTML!`);
     }
-
-    const blob = new Blob([content], { type: formatType === 'HTML' ? 'text/html' : 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `QuantumShield_Assessment_Report_${dateStr.replace(/\//g, '_')}.${formatType === 'HTML' ? 'html' : 'txt'}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    triggerToast(`Downloaded compliance assessment as ${formatType}!`);
   };
 
   return (
@@ -510,9 +591,19 @@ COMPLIANCE STANDARD MATURITY:
             <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#1E2D45]/45">
               <button 
                 onClick={() => handleDownload('PDF')}
-                className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer"
+                disabled={isDownloading}
+                className="flex items-center justify-center gap-2 border border-[#1E2D45] hover:bg-[#1A2540]/60 text-white font-semibold text-[12px] py-2 rounded-md transition-all cursor-pointer disabled:opacity-50"
               >
-                <Download size={13} /> Download Report (PDF)
+                {isDownloading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download size={13} /> Download Report (PDF)
+                  </>
+                )}
               </button>
               <button 
                 onClick={() => handleDownload('HTML')}
