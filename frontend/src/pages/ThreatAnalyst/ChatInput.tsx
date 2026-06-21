@@ -41,7 +41,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, disabled
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? "Streaming response..." : "Ask Quantum Shield AI analyst..."}
+          placeholder={isStreaming ? "Streaming response..." : "Ask Lattix - Q AI analyst..."}
           disabled={disabled || isStreaming}
           className="flex-1 resize-none bg-transparent py-2 px-3 text-sm text-white placeholder-slate-500 focus:outline-none max-h-40 min-h-[38px] leading-relaxed"
         />

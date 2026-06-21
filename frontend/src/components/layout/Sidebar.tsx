@@ -38,7 +38,7 @@ export const Sidebar: React.FC = () => {
       {/* Top Logo */}
       <div className="h-[60px] border-b border-[#1E2D45] flex items-center px-4 gap-2.5">
         <Atom className="text-[#00C4E8]" size={20} />
-        <span className="font-semibold text-[16px] text-[#E2E8F0] tracking-wide">QuantumShield</span>
+        <span className="font-semibold text-[16px] text-[#E2E8F0] tracking-wide">Lattix - Q</span>
       </div>
 
       {/* Nav Links */}
@@ -169,11 +169,11 @@ export const Sidebar: React.FC = () => {
         <div className="p-4 flex items-center justify-between bg-[#0D1421]/30 border-t border-[#1E2D45]/40">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center text-[#00C4E8] font-bold text-[13px] shrink-0">
-              QS
+              LQ
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[12px] font-semibold text-[#E2E8F0] leading-none">Admin User</span>
-              <span className="text-[10px] text-[#475569] font-mono truncate mt-1">admin@quantumshield.io</span>
+              <span className="text-[10px] text-[#475569] font-mono truncate mt-1">admin@lattixq.io</span>
             </div>
           </div>
           <button 

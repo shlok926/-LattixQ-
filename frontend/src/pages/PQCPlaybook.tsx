@@ -48,7 +48,7 @@ export const PQCPlaybook: React.FC = () => {
     }
   }`;
 
-  const localAuditCommand = `npx @quantumshield/audit-cli --dir ./src --exclude node_modules`;
+  const localAuditCommand = `npx @lattixq/audit-cli --dir ./src --exclude node_modules`;
 
   return (
     <div className="space-y-6">

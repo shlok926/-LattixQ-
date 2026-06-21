@@ -37,7 +37,7 @@ export default function ReportDownloader() {
     try {
       const payload = {
         system_info: {
-          name: "QuantumShield Primary Assessment",
+          name: "Lattix - Q Primary Assessment",
           files_scanned: 1,
           algorithms: [
             { algorithm: "RSA",  key_size: 2048 },
@@ -60,7 +60,7 @@ export default function ReportDownloader() {
         const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
         const a = document.createElement('a');
         a.href = url;
-        a.setAttribute('download', 'QuantumShield_Audit_Report.pdf');
+        a.setAttribute('download', 'Lattix_Q_Audit_Report.pdf');
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -68,7 +68,7 @@ export default function ReportDownloader() {
         const json = JSON.stringify(res.data, null, 2);
         const a = document.createElement('a');
         a.href = "data:text/json;charset=utf-8," + encodeURIComponent(json);
-        a.setAttribute('download', 'QuantumShield_Audit_Report.json');
+        a.setAttribute('download', 'Lattix_Q_Audit_Report.json');
         document.body.appendChild(a);
         a.click();
         a.remove();

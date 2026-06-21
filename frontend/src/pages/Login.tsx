@@ -87,7 +87,7 @@ export default function Login() {
             <Shield size={32} />
           </motion.div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
-            Quantum<span style={{ color: 'var(--accent)' }}>Shield</span>
+            Lattix<span style={{ color: 'var(--accent)' }}> - Q</span>
           </h1>
           <p className="text-muted text-sm">Enterprise Post-Quantum Intelligence</p>
         </div>

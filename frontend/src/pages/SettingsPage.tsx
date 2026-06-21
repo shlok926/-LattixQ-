@@ -77,7 +77,7 @@ export const SettingsPage: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-white">Security Settings</h1>
             <p className="text-sm text-[#94A3B8]">
-              Configure QuantumShield core algorithms, AI models, compliance guardrails, and API keys.
+              Configure Lattix - Q core algorithms, AI models, compliance guardrails, and API keys.
             </p>
           </div>
         </div>
@@ -191,8 +191,8 @@ export const SettingsPage: React.FC = () => {
                     onChange={(e) => setAiModel(e.target.value)}
                     className="w-full bg-[#080C14] border border-[#1E2D45] rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#00C4E8]"
                   >
-                    <option value="analyst-v2">QuantumShield-Analyst-V2 (Optimized)</option>
-                    <option value="defense-pro">QuantumShield-Defense-Pro (Deep)</option>
+                    <option value="analyst-v2">Lattix-Q-Analyst-V2 (Optimized)</option>
+                    <option value="defense-pro">Lattix-Q-Defense-Pro (Deep)</option>
                   </select>
                 </div>
 
@@ -307,7 +307,7 @@ export const SettingsPage: React.FC = () => {
               {/* Status Banner */}
               <div className="flex items-start gap-2 bg-[#00C4E8]/5 border border-[#00C4E8]/20 rounded p-3 text-[10px] leading-relaxed text-slate-300">
                 <AlertTriangle size={14} className="text-[#00C4E8] shrink-0 mt-0.5" />
-                <span>All cryptography settings are applied cluster-wide inside the QuantumShield API Gateway.</span>
+                <span>All cryptography settings are applied cluster-wide inside the Lattix - Q API Gateway.</span>
               </div>
             </div>
           </div>

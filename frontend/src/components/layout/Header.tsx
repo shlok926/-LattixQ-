@@ -37,7 +37,7 @@ export const Header: React.FC = () => {
       case '/playbook': return 'PQC Playbook';
       case '/global-race': return 'Global Race Tracker';
       case '/inventory': return 'Asset & Vendor Inventory';
-      default: return 'QuantumShield';
+      default: return 'Lattix - Q';
     }
   };
 
@@ -201,7 +201,7 @@ export const Header: React.FC = () => {
             }}
             className="w-8 h-8 rounded-full bg-[#1E2D45] hover:bg-[#2A3B5C] flex items-center justify-center text-[#00C4E8] font-bold text-[13px] border border-[#1E2D45] cursor-pointer transition-colors select-none"
           >
-            QS
+            LQ
           </div>
 
           {/* Profile Dropdown Panel */}
@@ -209,7 +209,7 @@ export const Header: React.FC = () => {
             <div className="absolute right-0 mt-2 w-[220px] bg-[#0B121F] border border-[#1E2D45] rounded-lg shadow-2xl overflow-hidden z-50 p-2 flex flex-col gap-1">
               <div className="px-3 py-2 flex flex-col">
                 <span className="text-[12px] font-semibold text-[#E2E8F0]">Admin User</span>
-                <span className="text-[10px] text-[#475569] font-mono mt-0.5 truncate">admin@quantumshield.io</span>
+                <span className="text-[10px] text-[#475569] font-mono mt-0.5 truncate">admin@lattixq.io</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#00C4E8]/10 text-[#00C4E8] font-medium self-start mt-2 border border-[#00C4E8]/20">
                   Role: {user?.role || 'Admin'}
                 </span>

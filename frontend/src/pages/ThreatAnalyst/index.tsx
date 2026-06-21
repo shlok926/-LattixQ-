@@ -42,7 +42,7 @@ const ThreatAnalyst: React.FC = () => {
                 Ask me anything about quantum security
               </h2>
               <p className="text-xs text-slate-400 max-w-md mt-2 leading-relaxed">
-                Consult QuantumShield AI for real-time analysis of Shor&apos;s and Grover&apos;s algorithm bounds,
+                Consult Lattix - Q AI for real-time analysis of Shor&apos;s and Grover&apos;s algorithm bounds,
                 post-quantum migration guidance, NIST standards, or to interpret your live simulation results.
               </p>
               <SuggestedPrompts onSelect={sendMessage} />

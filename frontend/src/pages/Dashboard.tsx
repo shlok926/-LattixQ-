@@ -124,7 +124,7 @@ export default function Dashboard() {
             <Activity className="text-[#a855f7]" size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-wider text-white">QUANTUMSHIELD</h1>
+            <h1 className="text-xl font-black tracking-wider text-white">LATTIX - Q</h1>
             <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-widest mt-0.5">Enterprise Cryptographic Ops Command</p>
           </div>
         </div>

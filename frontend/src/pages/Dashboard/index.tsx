@@ -516,7 +516,7 @@ export const Dashboard: React.FC = () => {
               <span className="mt-1.5"><StatusDot status="inactive" /></span>
               <div className="flex flex-col">
                 <span className="text-[#E2E8F0] font-medium">PDF Report generated and exported</span>
-                <span className="text-[11px] text-[#94A3B8] font-mono mt-0.5 font-mono">QuantumShield_Report_2026-06-14.pdf</span>
+                <span className="text-[11px] text-[#94A3B8] font-mono mt-0.5 font-mono">Lattix_Q_Report_2026-06-14.pdf</span>
               </div>
             </div>
             <span className="text-[11px] text-[#94A3B8] font-mono whitespace-nowrap">4h ago</span>
