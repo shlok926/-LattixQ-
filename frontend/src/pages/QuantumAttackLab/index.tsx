@@ -1,39 +1,271 @@
-import React, { useState } from 'react';
-import { Atom, Play, CheckCircle2, AlertTriangle, ShieldAlert, Cpu } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Atom, 
+  Play, 
+  CheckCircle2, 
+  AlertTriangle, 
+  ShieldAlert, 
+  Cpu, 
+  Info, 
+  Sliders, 
+  Download, 
+  Check, 
+  Activity, 
+  Layers, 
+  HelpCircle 
+} from 'lucide-react';
+
+interface ShorMetrics {
+  qubits: number;
+  circuitDepth: number;
+  classicalTime: string;
+  quantumTime: string;
+  gateFidelity: string;
+  coherenceTime: string;
+  physicalQubits: number;
+}
+
+interface GroverMetrics {
+  qubits: number;
+  iterations: string;
+  effectiveSecurity: string;
+  status: 'VULNERABLE' | 'SECURE';
+  depth: number;
+}
 
 export const QuantumAttackLab: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'shors' | 'grovers'>('shors');
-  const [shorTarget, setShorTarget] = useState<'RSA-512' | 'RSA-1024' | 'RSA-2048'>('RSA-2048');
+  const [activeTab, setActiveTab] = useState<'shors' | 'grovers' | 'comparison'>('shors');
+  
+  // Shor's Simulator States
+  const [shorTarget, setShorTarget] = useState<'RSA-1024' | 'RSA-2048' | 'RSA-4096'>('RSA-2048');
+  const [shorQubits, setShorQubits] = useState<number>(4096);
+  const [shorDepth, setShorDepth] = useState<number>(196608);
+  const [nisqEnabled, setNisqEnabled] = useState<boolean>(true);
+  const [nisqErrorRate, setNisqErrorRate] = useState<number>(0.001); // 0.1%
+
+  // Grover's Simulator States
   const [groverTarget, setGroverTarget] = useState<'AES-128' | 'AES-256'>('AES-128');
-  const [noiseModel, setNoiseModel] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [hasRunShor, setHasRunShor] = useState(true);
-  const [hasRunGrover, setHasRunGrover] = useState(true);
+  const [groverQubits, setGroverQubits] = useState<number>(129);
+  const [groverDepth, setGroverDepth] = useState<number>(1800000);
 
-  const triggerShorSim = () => {
-    setIsSimulating(true);
-    setHasRunShor(false);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setHasRunShor(true);
-    }, 1500);
+  // Simulation States
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simPhase, setSimPhase] = useState<number>(1);
+  const [simProgress, setSimProgress] = useState<number>(0);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const [hasRunShor, setHasRunShor] = useState<boolean>(true);
+  const [hasRunGrover, setHasRunGrover] = useState<boolean>(true);
+
+  // Auto-recalculate Shor's parameters on changes
+  useEffect(() => {
+    if (shorTarget === 'RSA-1024') {
+      setShorQubits(2048);
+      setShorDepth(98304);
+    } else if (shorTarget === 'RSA-2048') {
+      setShorQubits(4096);
+      setShorDepth(196608);
+    } else {
+      setShorQubits(8192);
+      setShorDepth(393216);
+    }
+  }, [shorTarget]);
+
+  // Auto-recalculate Grover's parameters on changes
+  useEffect(() => {
+    if (groverTarget === 'AES-128') {
+      setGroverQubits(129);
+      setGroverDepth(1800000);
+    } else {
+      setGroverQubits(257);
+      setGroverDepth(3600000);
+    }
+  }, [groverTarget]);
+
+  // Shor's Formulas
+  const getShorMetrics = (): ShorMetrics => {
+    const overheadMultiplier = nisqEnabled ? (1000 * (1 + nisqErrorRate * 25)) : 1;
+    const physQubits = Math.round(shorQubits * overheadMultiplier);
+    
+    // Gate fidelity required calculation
+    const fidelityVal = 1 - (1 / shorDepth);
+    const fidelityPct = (fidelityVal * 100).toFixed(4) + '%';
+    
+    // Coherence time required (assuming 10ns gate time + error multipliers)
+    const rawCoherenceMs = (shorDepth * 10) / 1000000; // ms
+    const coherenceMs = (rawCoherenceMs * (1 + nisqErrorRate * 100)).toFixed(2) + ' ms';
+
+    let classical = '13.7B years';
+    let quantum = '~8 hours';
+
+    if (shorTarget === 'RSA-1024') {
+      classical = '3.4M years';
+      quantum = '~1.5 hours';
+    } else if (shorTarget === 'RSA-4096') {
+      classical = '980T years';
+      quantum = '~34 hours';
+    }
+
+    return {
+      qubits: shorQubits,
+      circuitDepth: shorDepth,
+      classicalTime: classical,
+      quantumTime: quantum,
+      gateFidelity: fidelityPct,
+      coherenceTime: coherenceMs,
+      physicalQubits: physQubits
+    };
   };
 
-  const triggerGroverSim = () => {
-    setIsSimulating(true);
-    setHasRunGrover(false);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setHasRunGrover(true);
-    }, 1500);
+  // Grover's Formulas
+  const getGroverMetrics = (): GroverMetrics => {
+    if (groverTarget === 'AES-128') {
+      return {
+        qubits: groverQubits,
+        iterations: '3.40 × 10¹⁹',
+        effectiveSecurity: '128-bit → 64-bit',
+        status: 'VULNERABLE',
+        depth: groverDepth
+      };
+    } else {
+      return {
+        qubits: groverQubits,
+        iterations: '3.67 × 10³⁸',
+        effectiveSecurity: '256-bit → 128-bit',
+        status: 'SECURE',
+        depth: groverDepth
+      };
+    }
   };
+
+  // Preset Scenario triggers
+  const applyPreset = (preset: 'optimistic' | 'realistic' | 'pessimistic') => {
+    if (preset === 'optimistic') {
+      setNisqErrorRate(0.0001); // 0.01%
+    } else if (preset === 'realistic') {
+      setNisqErrorRate(0.001); // 0.1%
+    } else {
+      setNisqErrorRate(0.005); // 0.5%
+    }
+  };
+
+  // Run Simulation progress loop
+  const triggerSimulation = () => {
+    setIsSimulating(true);
+    setSimProgress(0);
+    setSimPhase(1);
+    setElapsedTime(0);
+    
+    if (activeTab === 'shors') {
+      setHasRunShor(false);
+    } else {
+      setHasRunGrover(false);
+    }
+
+    const duration = 4000; // 4s total
+    const intervalMs = 100;
+    let currentMs = 0;
+
+    const timer = setInterval(() => {
+      currentMs += intervalMs;
+      const progress = Math.min(100, Math.round((currentMs / duration) * 100));
+      setSimProgress(progress);
+      setElapsedTime(Number((currentMs / 1000).toFixed(1)));
+
+      // Set current phase based on progress
+      if (progress < 25) {
+        setSimPhase(1);
+      } else if (progress < 50) {
+        setSimPhase(2);
+      } else if (progress < 75) {
+        setSimPhase(3);
+      } else {
+        setSimPhase(4);
+      }
+
+      if (currentMs >= duration) {
+        clearInterval(timer);
+        setIsSimulating(false);
+        if (activeTab === 'shors') {
+          setHasRunShor(true);
+        } else {
+          setHasRunGrover(true);
+        }
+      }
+    }, intervalMs);
+  };
+
+  // Export Results
+  const exportSimulationData = () => {
+    const date = new Date().toLocaleString();
+    let dataStr = '';
+    
+    if (activeTab === 'shors') {
+      const shMetrics = getShorMetrics();
+      const payload = {
+        title: "Quantum Attack Lab - Shor's Algorithm Simulation Report",
+        timestamp: date,
+        target: shorTarget,
+        logical_qubits_estimated: shMetrics.qubits,
+        physical_qubits_required: shMetrics.physicalQubits,
+        circuit_depth: shMetrics.circuitDepth,
+        gate_fidelity_required: shMetrics.gateFidelity,
+        coherence_time_needed: shMetrics.coherenceTime,
+        classical_factoring_time: shMetrics.classicalTime,
+        quantum_factoring_time: shMetrics.quantumTime,
+        nisq_noise_model_applied: nisqEnabled,
+        modeled_error_rate: nisqEnabled ? `${(nisqErrorRate * 100).toFixed(2)}%` : "0.00%",
+        security_status: "CRITICAL COMPROMISE RISK"
+      };
+      dataStr = JSON.stringify(payload, null, 2);
+    } else {
+      const grMetrics = getGroverMetrics();
+      const payload = {
+        title: "Quantum Attack Lab - Grover's Search Simulation Report",
+        timestamp: date,
+        target: groverTarget,
+        logical_qubits_estimated: grMetrics.qubits,
+        quantum_iterations_required: grMetrics.iterations,
+        effective_key_security: grMetrics.effectiveSecurity,
+        status: grMetrics.status,
+        circuit_depth: grMetrics.depth,
+        security_status: grMetrics.status === 'SECURE' ? "COMPLIANT: Post-Quantum Equivalent" : "VULNERABLE: Key Entropy Halved"
+      };
+      dataStr = JSON.stringify(payload, null, 2);
+    }
+
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `quantum_attack_lab_${activeTab}_report.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const shorMetrics = getShorMetrics();
+  const groverMetrics = getGroverMetrics();
 
   return (
     <div className="space-y-6 text-[#E2E8F0] select-none pb-12">
+      {/* Educational Disclaimer Banner */}
+      <div className="bg-[#3D2A1F] border-l-4 border-[#FF9500] px-4 py-3 rounded-lg flex items-start gap-3">
+        <AlertTriangle size={18} className="text-[#FF9500] shrink-0 mt-0.5" />
+        <p className="text-[12px] text-[#E8B17A] leading-relaxed">
+          <strong>Educational Simulation Only</strong> — These visualizations demonstrate quantum cryptanalysis complexity theoretically. No actual exploit code is executed. Results assume fully error-corrected quantum computers; current hardware cannot perform these attacks.
+        </p>
+      </div>
+
       {/* Top Header */}
-      <div>
-        <h1 className="text-[24px] font-semibold text-[#E2E8F0] tracking-wide">Quantum Attack Lab</h1>
-        <p className="text-[13px] text-[#94A3B8] mt-0.5">Evaluate and simulate quantum factorization and amplitude amplification attacks on cryptosystems</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-[24px] font-semibold text-[#E2E8F0] tracking-wide">Quantum Attack Lab</h1>
+          <p className="text-[13px] text-[#94A3B8] mt-0.5">Evaluate and simulate quantum factorization and amplitude amplification attacks on cryptosystems</p>
+        </div>
+        <div className="text-[10px] bg-[#00C4E8]/10 text-[#00C4E8] border border-[#00C4E8]/20 px-2.5 py-1 rounded font-mono uppercase tracking-wider">
+          NIST PQC Assessment Active
+        </div>
       </div>
 
       {/* Tabs */}
@@ -46,7 +278,7 @@ export const QuantumAttackLab: React.FC = () => {
               : 'border-transparent text-[#94A3B8] hover:text-[#E2E8F0]'
           }`}
         >
-          Shor's Algorithm
+          🔐 Shor's Algorithm (RSA)
         </button>
         <button
           onClick={() => setActiveTab('grovers')}
@@ -56,27 +288,35 @@ export const QuantumAttackLab: React.FC = () => {
               : 'border-transparent text-[#94A3B8] hover:text-[#E2E8F0]'
           }`}
         >
-          Grover's Algorithm
+          📊 Grover's Algorithm (Symmetric)
+        </button>
+        <button
+          onClick={() => setActiveTab('comparison')}
+          className={`px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 border-b-2 ${
+            activeTab === 'comparison'
+              ? 'border-[#00C4E8] text-[#00C4E8]'
+              : 'border-transparent text-[#94A3B8] hover:text-[#E2E8F0]'
+          }`}
+        >
+          ⚖️ Algorithm Comparison
         </button>
       </div>
 
-      {/* Main Container */}
-      {activeTab === 'shors' ? (
-        /* SHOR'S TAB */
+      {activeTab === 'shors' && (
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-          {/* Left panel (40%) */}
-          <div className="lg:col-span-4 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[420px]">
+          {/* Controls Panel (4 Columns) */}
+          <div className="lg:col-span-4 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[460px]">
             <div className="space-y-6">
               <div>
                 <h3 className="text-[15px] font-semibold text-white">Shor's Algorithm Simulator</h3>
-                <p className="text-[12px] text-[#94A3B8] mt-0.5">Simulates quantum factoring attack on RSA cryptosystems</p>
+                <p className="text-[12px] text-[#94A3B8] mt-0.5">Configure Shor's factorization register and error metrics</p>
               </div>
 
-              {/* RSA Target Selector */}
+              {/* Target RSA Key Size */}
               <div className="space-y-2">
                 <span className="text-[11px] font-bold text-[#475569] uppercase tracking-wider block">Target RSA Key Size</span>
                 <div className="grid grid-cols-3 gap-2 bg-[#080C14] border border-[#1E2D45] rounded-lg p-1">
-                  {(['RSA-512', 'RSA-1024', 'RSA-2048'] as const).map((sz) => (
+                  {(['RSA-1024', 'RSA-2048', 'RSA-4096'] as const).map((sz) => (
                     <button
                       key={sz}
                       onClick={() => setShorTarget(sz)}
@@ -86,148 +326,261 @@ export const QuantumAttackLab: React.FC = () => {
                           : 'text-[#94A3B8] hover:text-[#E2E8F0] border border-transparent'
                       }`}
                     >
-                      {sz}
+                      {sz.replace('RSA-', '')} bits
                     </button>
                   ))}
                 </div>
               </div>
 
+              {/* Slider for Logical Qubits */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[11px] font-bold text-[#475569] uppercase tracking-wider">
+                  <span>Logical Qubits (Estimated)</span>
+                  <span className="text-[#00C4E8] font-mono normal-case">{shorQubits.toLocaleString()} qubits</span>
+                </div>
+                <input
+                  type="range"
+                  min={1000}
+                  max={20000}
+                  step={100}
+                  value={shorQubits}
+                  onChange={(e) => setShorQubits(Number(e.target.value))}
+                  className="w-full h-1 bg-[#1E2D45] rounded-lg appearance-none cursor-pointer accent-[#00C4E8]"
+                />
+                <span className="text-[10px] text-[#475569] block">Logical registers needed to calculate prime factors.</span>
+              </div>
+
+              {/* Slider for Circuit Depth */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[11px] font-bold text-[#475569] uppercase tracking-wider">
+                  <span>Circuit Depth (Estimated)</span>
+                  <span className="text-white font-mono normal-case">{shorDepth.toLocaleString()} gates</span>
+                </div>
+                <input
+                  type="range"
+                  min={50000}
+                  max={1000000}
+                  step={10000}
+                  value={shorDepth}
+                  onChange={(e) => setShorDepth(Number(e.target.value))}
+                  className="w-full h-1 bg-[#1E2D45] rounded-lg appearance-none cursor-pointer accent-[#00C4E8]"
+                />
+              </div>
+
               {/* Noise Model Toggle */}
               <div className="flex items-center justify-between bg-[#080C14]/50 border border-[#1E2D45]/40 rounded-lg p-3">
                 <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-white">Include NISQ Noise Model</span>
+                  <span className="text-[12px] font-semibold text-white">Include NISQ Error Model</span>
                   <span className="text-[10px] text-[#475569]">Simulate decoherence and gate errors</span>
                 </div>
                 <button
-                  onClick={() => setNoiseModel(!noiseModel)}
+                  onClick={() => setNisqEnabled(!nisqEnabled)}
                   className={`w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 ${
-                    noiseModel ? 'bg-[#00C4E8]' : 'bg-[#1E2D45]'
+                    nisqEnabled ? 'bg-[#00C4E8]' : 'bg-[#1E2D45]'
                   }`}
                 >
                   <span className={`w-4 h-4 rounded-full bg-white transition-transform transform ${
-                    noiseModel ? 'translate-x-4' : 'translate-x-0'
+                    nisqEnabled ? 'translate-x-4' : 'translate-x-0'
                   }`} />
                 </button>
               </div>
+
+              {/* NISQ Error Rate Slider */}
+              {nisqEnabled && (
+                <div className="space-y-2 animate-fadeIn">
+                  <div className="flex justify-between items-center text-[11px] font-bold text-[#475569] uppercase tracking-wider">
+                    <span>NISQ Error Rate per Gate</span>
+                    <span className="text-[#00C4E8] font-mono normal-case">{(nisqErrorRate * 100).toFixed(2)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.0001}
+                    max={0.01}
+                    step={0.0001}
+                    value={nisqErrorRate}
+                    onChange={(e) => setNisqErrorRate(Number(e.target.value))}
+                    className="w-full h-1 bg-[#1E2D45] rounded-lg appearance-none cursor-pointer accent-[#00C4E8]"
+                  />
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={triggerShorSim}
-              disabled={isSimulating}
-              className="w-full bg-[#00C4E8] hover:bg-[#0096B4] text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 mt-6"
-            >
-              {isSimulating ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-[#080C14] border-t-transparent rounded-full animate-spin" />
-                  Compiling Circuit...
-                </>
-              ) : (
-                <>
+            {/* Actions & Presets */}
+            <div className="space-y-4 pt-6 border-t border-[#1E2D45]/40">
+              <div className="flex justify-between text-[11px] text-[#475569] font-mono">
+                <span>Presets:</span>
+                <div className="flex gap-2">
+                  <button onClick={() => applyPreset('optimistic')} className="hover:text-[#00C4E8] transition">Optimistic</button>
+                  <span>•</span>
+                  <button onClick={() => applyPreset('realistic')} className="hover:text-[#00C4E8] transition">Realistic</button>
+                  <span>•</span>
+                  <button onClick={() => applyPreset('pessimistic')} className="hover:text-[#00C4E8] transition">Pessimistic</button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={triggerSimulation}
+                  disabled={isSimulating}
+                  className="flex-1 bg-[#00C4E8] hover:bg-[#0096B4] text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
                   <Play size={14} fill="currentColor" />
-                  Launch Simulation
-                </>
-              )}
-            </button>
+                  Run Simulation
+                </button>
+                <button
+                  onClick={exportSimulationData}
+                  disabled={isSimulating || !hasRunShor}
+                  className="px-4 bg-[#080C14] hover:bg-[#1E2D45] border border-[#1E2D45] text-slate-300 font-semibold rounded-md text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download size={14} />
+                  Export
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Right panel (60%) */}
-          <div className="lg:col-span-6 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-center min-h-[420px]">
-            {!hasRunShor ? (
-              <div className="text-center py-12 flex flex-col items-center gap-3">
-                <Atom size={48} className="text-[#1E2D45] animate-spin" />
-                <span className="text-[14px] text-[#94A3B8]">Configuring Shor's Factorization registers...</span>
+          {/* Results Panel (6 Columns) */}
+          <div className="lg:col-span-6 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[460px]">
+            {isSimulating ? (
+              <div className="flex-1 flex flex-col justify-center space-y-6 py-8">
+                <div className="text-center flex flex-col items-center gap-2">
+                  <Atom size={44} className="text-[#00C4E8] animate-spin" />
+                  <span className="text-[14px] font-bold text-white tracking-wider">Shor's Factorization In Progress</span>
+                  <span className="text-[11px] text-[#94A3B8]">Elapsed: {elapsedTime}s / Estimated: {(4.0 - elapsedTime).toFixed(1)}s remaining</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-mono text-[#94A3B8]">
+                    <span>Register Compiling...</span>
+                    <span>{simProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[#080C14] border border-[#1E2D45] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#00C4E8] to-[#9333EA] transition-all duration-100" style={{ width: `${simProgress}%` }} />
+                  </div>
+                </div>
+
+                {/* Phase specific updates */}
+                <div className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-4 flex gap-3 animate-pulse">
+                  <span className="text-lg">⚙️</span>
+                  <div className="text-xs">
+                    {simPhase === 1 && (
+                      <>
+                        <strong>Phase 1/4: Initializing Register Setup</strong>
+                        <p className="text-[#94A3B8] mt-1">Configuring {shorQubits} logical qubits into superposition states...</p>
+                      </>
+                    )}
+                    {simPhase === 2 && (
+                      <>
+                        <strong>Phase 2/4: Modular Exponentiation Circuit</strong>
+                        <p className="text-[#94A3B8] mt-1">Executing modular multiplication cascade ({shorDepth} base gates)...</p>
+                      </>
+                    )}
+                    {simPhase === 3 && (
+                      <>
+                        <strong>Phase 3/4: Quantum Fourier Transform (QFT)</strong>
+                        <p className="text-[#94A3B8] mt-1">Transforming periodicity measurements from registers...</p>
+                      </>
+                    )}
+                    {simPhase === 4 && (
+                      <>
+                        <strong>Phase 4/4: Measurement & Readout</strong>
+                        <p className="text-[#94A3B8] mt-1">Extracting classical factors from collapse probability distributions...</p>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="flex items-center gap-2 text-[#22C55E]">
-                  <CheckCircle2 size={18} />
-                  <span className="text-[14px] font-bold uppercase tracking-wider">Simulation Complete</span>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-[#22C55E]">
+                    <CheckCircle2 size={16} />
+                    <span className="text-[13px] font-bold uppercase tracking-wider">Simulation Output</span>
+                  </div>
+                  <span className="text-[10px] text-[#475569] font-mono">Last Run: {new Date().toLocaleTimeString()}</span>
                 </div>
 
-                {/* 4 KPI cards */}
+                {/* 4 KPIs with Tooltips */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Qubits Required</span>
-                    <h4 className="text-2xl font-black text-[#EF4444] font-mono mt-1">4,099</h4>
+                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4 relative group">
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider flex items-center gap-1">
+                      Logical Qubits Required
+                      <HelpCircle size={10} className="text-slate-500 cursor-pointer" />
+                    </span>
+                    <h4 className="text-2xl font-black text-white font-mono mt-1">{shorMetrics.qubits.toLocaleString()}</h4>
+                    {/* Tooltip */}
+                    <div className="absolute hidden group-hover:block bg-[#121B2E] text-[#94A3B8] border border-[#1E2D45] text-[10px] p-2.5 rounded-lg w-52 z-30 bottom-12 left-4 shadow-xl font-mono leading-relaxed">
+                      Assuming a 1000:1 physical-to-logical error correction code (ECC) overhead ratio.
+                    </div>
                   </div>
-                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Circuit Depth</span>
-                    <h4 className="text-2xl font-black text-white font-mono mt-1">196,608</h4>
+
+                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4 relative group">
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider flex items-center gap-1">
+                      Physical Qubits
+                      <HelpCircle size={10} className="text-slate-500 cursor-pointer" />
+                    </span>
+                    <h4 className="text-2xl font-black text-[#FF9500] font-mono mt-1">{shorMetrics.physicalQubits.toLocaleString()}</h4>
+                    <div className="absolute hidden group-hover:block bg-[#121B2E] text-[#94A3B8] border border-[#1E2D45] text-[10px] p-2.5 rounded-lg w-52 z-30 bottom-12 right-4 shadow-xl font-mono leading-relaxed">
+                      Total physical qubits required considering NISQ noise level of {(nisqErrorRate * 100).toFixed(2)}%.
+                    </div>
                   </div>
+
                   <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Classical Factoring Time</span>
-                    <h4 className="text-2xl font-black text-white font-mono mt-1">13.7B years</h4>
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Classical GNFS Time</span>
+                    <h4 className="text-xl font-black text-white font-mono mt-1.5">{shorMetrics.classicalTime}</h4>
                   </div>
-                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Quantum Factoring Time</span>
-                    <h4 className="text-2xl font-black text-[#EF4444] font-mono mt-1">~8 hours</h4>
+
+                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4 relative group">
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider flex items-center gap-1">
+                      Quantum factoring time
+                      <HelpCircle size={10} className="text-slate-500 cursor-pointer" />
+                    </span>
+                    <h4 className="text-xl font-black text-[#EF4444] font-mono mt-1.5">{shorMetrics.quantumTime}</h4>
+                    <div className="absolute hidden group-hover:block bg-[#121B2E] text-[#94A3B8] border border-[#1E2D45] text-[10px] p-2.5 rounded-lg w-52 z-30 bottom-12 right-4 shadow-xl font-mono leading-relaxed">
+                      Assuming T-gate distillation rate of 10k/sec and continuous coherence preservation.
+                    </div>
                   </div>
                 </div>
 
-                {/* Verdict Box */}
+                {/* NISQ Coherence Stats */}
+                <div className="bg-[#080C14] border border-[#1E2D45]/60 rounded-xl p-4 grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div>
+                    <span className="text-[#475569] text-[9px] block">Gate Fidelity Required</span>
+                    <span className="text-white font-bold block mt-0.5">{shorMetrics.gateFidelity}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#475569] text-[9px] block">Coherence Time Required</span>
+                    <span className="text-[#00C4E8] font-bold block mt-0.5">{shorMetrics.coherenceTime}</span>
+                  </div>
+                </div>
+
+                {/* Cryptographic Break Alert */}
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex gap-3">
                   <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={18} />
                   <div className="space-y-1">
-                    <h5 className="text-[12px] font-black text-red-400 uppercase tracking-widest">⚠ CRYPTOGRAPHIC BREAK CONFIRMED</h5>
-                    <p className="text-[12px] text-[#94A3B8] leading-relaxed">
-                      RSA-2048 can be broken by a fault-tolerant quantum computer with 4,099 logical qubits. Current NISQ devices cannot perform this attack, but this represents a future existential threat.
+                    <h5 className="text-[11px] font-black text-red-400 uppercase tracking-widest">⚠ Cryptographic Vulnerability Alert</h5>
+                    <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                      {shorTarget} is vulnerable to Shor's Factorization. A fault-tolerant processor of {shorMetrics.qubits} logical qubits can resolve keys in {shorMetrics.quantumTime}. Traditional security parameters are compromised.
                     </p>
                   </div>
                 </div>
-
-                {/* SVG Circuit wires */}
-                <div className="space-y-2 bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                  <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider block">Quantum Circuit Preview</span>
-                  <div className="h-[90px] w-full border border-white/[0.02] bg-black/20 rounded p-1">
-                    <svg width="100%" height="100%" viewBox="0 0 450 75">
-                      {/* Wires */}
-                      {[10, 20, 30, 40, 50, 60, 70].map((y, idx) => (
-                        <line key={idx} x1="10" y1={y} x2="440" y2={y} stroke="#1E2D45" strokeWidth="1" />
-                      ))}
-                      {/* Gates */}
-                      {/* Hadamard Gates */}
-                      <rect x="50" y="5" width="15" height="10" fill="#00C4E8" rx="2" />
-                      <text x="57" y="13" textAnchor="middle" fill="#080C14" className="text-[8px] font-bold">H</text>
-                      <rect x="50" y="15" width="15" height="10" fill="#00C4E8" rx="2" />
-                      <text x="57" y="23" textAnchor="middle" fill="#080C14" className="text-[8px] font-bold">H</text>
-
-                      {/* CNOT Gates */}
-                      <circle cx="120" cy="20" r="3" fill="#F59E0B" />
-                      <line x1="120" y1="20" x2="120" y2="50" stroke="#F59E0B" strokeWidth="1" />
-                      <circle cx="120" cy="50" r="4" fill="none" stroke="#F59E0B" strokeWidth="1" />
-                      <line x1="117" y1="50" x2="123" y2="50" stroke="#F59E0B" strokeWidth="1" />
-                      <line x1="120" y1="47" x2="120" y2="53" stroke="#F59E0B" strokeWidth="1" />
-
-                      {/* QFT Module */}
-                      <rect x="220" y="5" width="40" height="40" fill="#A855F7" rx="3" />
-                      <text x="240" y="28" textAnchor="middle" fill="white" className="text-[9px] font-bold">QFT</text>
-
-                      {/* More gates */}
-                      <rect x="330" y="25" width="15" height="10" fill="#00C4E8" rx="2" />
-                      <text x="337" y="33" textAnchor="middle" fill="#080C14" className="text-[8px] font-bold">H</text>
-                    </svg>
-                  </div>
-                  <span className="text-[10px] text-[#475569] block font-mono">
-                    Simplified circuit representation (4,099 qubits → 8 shown)
-                  </span>
-                </div>
-
               </div>
             )}
           </div>
         </div>
-      ) : (
-        /* GROVER'S TAB */
+      )}
+
+      {activeTab === 'grovers' && (
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-          {/* Left panel (40%) */}
-          <div className="lg:col-span-4 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[420px]">
+          {/* Grover's Controls (4 Columns) */}
+          <div className="lg:col-span-4 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[460px]">
             <div className="space-y-6">
               <div>
                 <h3 className="text-[15px] font-semibold text-white">Grover's Algorithm Simulator</h3>
-                <p className="text-[12px] text-[#94A3B8] mt-0.5">Simulates quantum database search on symmetric cryptosystems</p>
+                <p className="text-[12px] text-[#94A3B8] mt-0.5">Simulate search amplitude amplification for symmetric ciphers</p>
               </div>
 
-              {/* AES Target Selector */}
+              {/* Symmetric Cipher Target Selector */}
               <div className="space-y-2">
                 <span className="text-[11px] font-bold text-[#475569] uppercase tracking-wider block">Target Symmetric Cipher</span>
                 <div className="grid grid-cols-2 gap-2 bg-[#080C14] border border-[#1E2D45] rounded-lg p-1">
@@ -247,122 +600,354 @@ export const QuantumAttackLab: React.FC = () => {
                 </div>
               </div>
 
-              {/* Noise Model Toggle */}
-              <div className="flex items-center justify-between bg-[#080C14]/50 border border-[#1E2D45]/40 rounded-lg p-3">
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-white">Include NISQ Noise Model</span>
-                  <span className="text-[10px] text-[#475569]">Simulate decoherence and gate errors</span>
+              {/* Grover's Qubits Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[11px] font-bold text-[#475569] uppercase tracking-wider">
+                  <span>Qubits Required</span>
+                  <span className="text-[#00C4E8] font-mono normal-case">{groverQubits} qubits</span>
                 </div>
-                <button
-                  onClick={() => setNoiseModel(!noiseModel)}
-                  className={`w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 ${
-                    noiseModel ? 'bg-[#00C4E8]' : 'bg-[#1E2D45]'
-                  }`}
-                >
-                  <span className={`w-4 h-4 rounded-full bg-white transition-transform transform ${
-                    noiseModel ? 'translate-x-4' : 'translate-x-0'
-                  }`} />
-                </button>
+                <input
+                  type="range"
+                  min={50}
+                  max={1000}
+                  value={groverQubits}
+                  onChange={(e) => setGroverQubits(Number(e.target.value))}
+                  className="w-full h-1 bg-[#1E2D45] rounded-lg appearance-none cursor-pointer accent-[#00C4E8]"
+                />
+              </div>
+
+              {/* Grover's Circuit Depth Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[11px] font-bold text-[#475569] uppercase tracking-wider">
+                  <span>Oracle Circuit Depth</span>
+                  <span className="text-white font-mono normal-case">{groverDepth.toLocaleString()} gates</span>
+                </div>
+                <input
+                  type="range"
+                  min={500000}
+                  max={10000000}
+                  step={50000}
+                  value={groverDepth}
+                  onChange={(e) => setGroverDepth(Number(e.target.value))}
+                  className="w-full h-1 bg-[#1E2D45] rounded-lg appearance-none cursor-pointer accent-[#00C4E8]"
+                />
+              </div>
+
+              <div className="bg-[#080C14]/30 border border-[#1E2D45]/40 rounded-lg p-3 text-[11px] text-[#94A3B8] leading-relaxed">
+                ℹ️ Grover's search operates by quadratically speeding up database searches. For symmetric ciphers, it reduces the effective key security parameter to exactly half (2^(N/2)).
               </div>
             </div>
 
-            <button
-              onClick={triggerGroverSim}
-              disabled={isSimulating}
-              className="w-full bg-[#00C4E8] hover:bg-[#0096B4] text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 mt-6"
-            >
-              {isSimulating ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-[#080C14] border-t-transparent rounded-full animate-spin" />
-                  Running Search...
-                </>
-              ) : (
-                <>
-                  <Play size={14} fill="currentColor" />
-                  Launch Simulation
-                </>
-              )}
-            </button>
+            {/* Actions */}
+            <div className="flex gap-3 pt-6 border-t border-[#1E2D45]/40">
+              <button
+                onClick={triggerSimulation}
+                disabled={isSimulating}
+                className="flex-1 bg-[#00C4E8] hover:bg-[#0096B4] text-[#080C14] font-bold text-[13px] py-2.5 rounded-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Play size={14} fill="currentColor" />
+                Run Simulation
+              </button>
+              <button
+                onClick={exportSimulationData}
+                disabled={isSimulating || !hasRunGrover}
+                className="px-4 bg-[#080C14] hover:bg-[#1E2D45] border border-[#1E2D45] text-slate-300 font-semibold rounded-md text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Download size={14} />
+                Export
+              </button>
+            </div>
           </div>
 
-          {/* Right panel (60%) */}
-          <div className="lg:col-span-6 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-center min-h-[420px]">
-            {!hasRunGrover ? (
-              <div className="text-center py-12 flex flex-col items-center gap-3">
-                <Atom size={48} className="text-[#1E2D45] animate-spin" />
-                <span className="text-[14px] text-[#94A3B8]">Configuring Grover's Amplitude Amplification registers...</span>
+          {/* Grover's Results (6 Columns) */}
+          <div className="lg:col-span-6 bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 flex flex-col justify-between min-h-[460px]">
+            {isSimulating ? (
+              <div className="flex-1 flex flex-col justify-center space-y-6 py-8">
+                <div className="text-center flex flex-col items-center gap-2">
+                  <Atom size={44} className="text-[#00C4E8] animate-spin" />
+                  <span className="text-[14px] font-bold text-white tracking-wider">Grover search iteration in progress</span>
+                  <span className="text-[11px] text-[#94A3B8]">Elapsed: {elapsedTime}s / Estimated: {(4.0 - elapsedTime).toFixed(1)}s remaining</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-mono text-[#94A3B8]">
+                    <span>Iterating Oracle States...</span>
+                    <span>{simProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-[#080C14] border border-[#1E2D45] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#00C4E8] to-[#A855F7] transition-all duration-100" style={{ width: `${simProgress}%` }} />
+                  </div>
+                </div>
+
+                {/* Phase specific updates */}
+                <div className="bg-[#080C14] border border-[#1E2D45] rounded-lg p-4 flex gap-3 animate-pulse">
+                  <span className="text-lg">⚙️</span>
+                  <div className="text-xs">
+                    {simPhase === 1 && (
+                      <>
+                        <strong>Phase 1/4: Oracle Register Synthesis</strong>
+                        <p className="text-[#94A3B8] mt-1">Initializing quantum registers for N={groverQubits} states...</p>
+                      </>
+                    )}
+                    {simPhase === 2 && (
+                      <>
+                        <strong>Phase 2/4: Oracle Query Iterations</strong>
+                        <p className="text-[#94A3B8] mt-1">Running state inversion over evaluation oracle inputs...</p>
+                      </>
+                    )}
+                    {simPhase === 3 && (
+                      <>
+                        <strong>Phase 3/4: Amplitude Amplification (Diffusion)</strong>
+                        <p className="text-[#94A3B8] mt-1">Applying diffusion transforms around state average values...</p>
+                      </>
+                    )}
+                    {simPhase === 4 && (
+                      <>
+                        <strong>Phase 4/4: Measurement Collapse</strong>
+                        <p className="text-[#94A3B8] mt-1">Recording target search vector coordinates...</p>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="flex items-center gap-2 text-[#22C55E]">
-                  <CheckCircle2 size={18} />
-                  <span className="text-[14px] font-bold uppercase tracking-wider">Simulation Complete</span>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-[#22C55E]">
+                    <CheckCircle2 size={16} />
+                    <span className="text-[13px] font-bold uppercase tracking-wider">Simulation Output</span>
+                  </div>
+                  <span className="text-[10px] text-[#475569] font-mono">Last Run: {new Date().toLocaleTimeString()}</span>
                 </div>
 
-                {/* 4 KPI cards */}
+                {/* Grover's KPI Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
                     <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Required Qubits</span>
-                    <h4 className="text-2xl font-black text-white font-mono mt-1">129 logical qubits</h4>
+                    <h4 className="text-2xl font-black text-white font-mono mt-1">{groverMetrics.qubits}</h4>
+                    <span className="text-[9.5px] text-[#475569] font-mono block mt-1">Logical register capacity</span>
                   </div>
-                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Quantum Iterations</span>
-                    <h4 className="text-xl font-black text-white font-mono mt-1.5 break-all">340,282,366,920,938</h4>
+
+                  <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4 relative group">
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider flex items-center gap-1">
+                      Quantum Iterations
+                      <HelpCircle size={10} className="text-slate-500 cursor-pointer" />
+                    </span>
+                    <h4 className="text-lg font-black text-white font-mono mt-2 break-all">{groverMetrics.iterations}</h4>
+                    <div className="absolute hidden group-hover:block bg-[#121B2E] text-[#94A3B8] border border-[#1E2D45] text-[10px] p-2.5 rounded-lg w-52 z-30 bottom-12 right-4 shadow-xl font-mono leading-relaxed">
+                      Total oracle query cycles needed to amplify success probability to ~99.9%.
+                    </div>
                   </div>
+
                   <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
                     <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Effective Key Security</span>
-                    <h4 className="text-2xl font-black text-[#EF4444] font-mono mt-1">128-bit → 64-bit</h4>
+                    <h4 className="text-xl font-black text-[#EF4444] font-mono mt-1.5">{groverMetrics.effectiveSecurity}</h4>
                   </div>
+
                   <div className="bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
-                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Evaluation Verdict</span>
-                    <h4 className="text-[13px] font-black text-[#EF4444] uppercase tracking-wider mt-2.5">SECURITY HALVED</h4>
+                    <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider">Evaluation Status</span>
+                    <h4 className={`text-md font-black uppercase tracking-wider mt-2.5 ${
+                      groverMetrics.status === 'SECURE' ? 'text-[#22C55E]' : 'text-[#EF4444]'
+                    }`}>{groverMetrics.status === 'SECURE' ? 'PQC COMPLIANT (SAFE)' : 'SECURITY HALVED'}</h4>
                   </div>
                 </div>
 
-                {/* Verdict Box */}
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex gap-3">
-                  <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={18} />
+                {/* Grover's Verdict Alert */}
+                <div className={`border rounded-xl p-4 flex gap-3 ${
+                  groverMetrics.status === 'SECURE' 
+                    ? 'bg-[#1F3A1F]/30 border-green-500/30 text-green-400' 
+                    : 'bg-[#3D2A1F]/30 border-[#FF9500]/30 text-[#E8B17A]'
+                }`}>
+                  <AlertTriangle className="shrink-0 mt-0.5" size={18} />
                   <div className="space-y-1">
-                    <h5 className="text-[12px] font-black text-red-400 uppercase tracking-widest">⚠ MITIGATION RECOMMENDATION</h5>
-                    <p className="text-[12px] text-[#94A3B8] leading-relaxed">
-                      Grover's search reduces the effective key length of AES symmetric algorithms to half of their bit length. Upgrading key length (e.g. from AES-128 to AES-256) protects symmetric architectures.
+                    <h5 className="text-[11px] font-black uppercase tracking-widest">
+                      {groverMetrics.status === 'SECURE' ? '✓ Standard Compliant' : '⚠️ CRYPTOGRAPHIC RECOMMENDATION'}
+                    </h5>
+                    <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                      {groverTarget === 'AES-128' 
+                        ? "AES-128 is downgraded to 64-bit effective security. This is within range of massive parallel pre-computation. Upgrade to AES-256 immediately."
+                        : "AES-256's effective security remains 128-bit under Grover's attack. 128-bits of quantum entropy is secure against any theoretical physical quantum processor."
+                      }
                     </p>
                   </div>
                 </div>
 
-                {/* SVG Circuit wires */}
+                {/* Circuit schematic */}
                 <div className="space-y-2 bg-[#080C14] border border-[#1E2D45]/40 rounded-xl p-4">
                   <span className="text-[10px] text-[#475569] uppercase font-bold tracking-wider block">Grover Diffusion Circuit Preview</span>
                   <div className="h-[90px] w-full border border-white/[0.02] bg-black/20 rounded p-1">
                     <svg width="100%" height="100%" viewBox="0 0 450 75">
-                      {/* Wires */}
                       {[10, 20, 30, 40, 50, 60, 70].map((y, idx) => (
                         <line key={idx} x1="10" y1={y} x2="440" y2={y} stroke="#1E2D45" strokeWidth="1" />
                       ))}
-                      {/* Oracle */}
                       <rect x="70" y="5" width="40" height="50" fill="#EF4444" rx="3" />
                       <text x="90" y="33" textAnchor="middle" fill="white" className="text-[8px] font-bold">Oracle</text>
-
-                      {/* Hadamard */}
                       <rect x="150" y="5" width="15" height="10" fill="#00C4E8" rx="2" />
                       <text x="157" y="13" textAnchor="middle" fill="#080C14" className="text-[8px] font-bold">H</text>
-
-                      {/* Phase Shift */}
                       <rect x="210" y="5" width="50" height="50" fill="#A855F7" rx="3" />
                       <text x="235" y="33" textAnchor="middle" fill="white" className="text-[8px] font-bold">Diffusion</text>
-
-                      {/* Hadamard */}
                       <rect x="310" y="5" width="15" height="10" fill="#00C4E8" rx="2" />
                       <text x="317" y="13" textAnchor="middle" fill="#080C14" className="text-[8px] font-bold">H</text>
                     </svg>
                   </div>
-                  <span className="text-[10px] text-[#475569] block font-mono">
-                    Simplified amplitude amplification circuit representation
-                  </span>
                 </div>
-
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'comparison' && (
+        <div className="space-y-6">
+          {/* Comparison table */}
+          <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-6">
+            <h3 className="text-[15px] font-semibold text-white mb-4">Post-Quantum Cryptography vs Legacy Classical Standard</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse font-mono text-xs">
+                <thead>
+                  <tr className="border-b border-[#1E2D45] text-[10px] text-[#475569] uppercase font-bold tracking-wider">
+                    <th className="pb-3">Algorithm</th>
+                    <th className="pb-3">Mathematical Type</th>
+                    <th className="pb-3">Classical Security</th>
+                    <th className="pb-3">Quantum Security (Shor/Grover)</th>
+                    <th className="pb-3">PQC Migration Compliance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1E2D45]/60">
+                  <tr className="hover:bg-[#1A2540]/30 transition">
+                    <td className="py-3.5 font-bold text-white">RSA-2048</td>
+                    <td className="py-3.5 text-[#94A3B8]">Prime Integer Factorization</td>
+                    <td className="py-3.5 text-green-400">~13.7 Billion Years</td>
+                    <td className="py-3.5 text-red-500 font-bold">~8 Hours (Broken by Shor's)</td>
+                    <td className="py-3.5">
+                      <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[10px]">Vulnerable</span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-[#1A2540]/30 transition">
+                    <td className="py-3.5 font-bold text-white">ECDSA (P-256)</td>
+                    <td className="py-3.5 text-[#94A3B8]">Elliptic Curve Discrete Log</td>
+                    <td className="py-3.5 text-green-400">Stable (Standard)</td>
+                    <td className="py-3.5 text-red-500 font-bold">~1 Hour (Broken by Shor's)</td>
+                    <td className="py-3.5">
+                      <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[10px]">Vulnerable</span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-[#1A2540]/30 transition">
+                    <td className="py-3.5 font-bold text-white">AES-256</td>
+                    <td className="py-3.5 text-[#94A3B8]">Symmetric Key Substitution</td>
+                    <td className="py-3.5 text-green-400">256-bit entropy</td>
+                    <td className="py-3.5 text-green-400">128-bit quantum entropy (Safe)</td>
+                    <td className="py-3.5">
+                      <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded text-[10px]">Compliant</span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-[#1A2540]/30 transition">
+                    <td className="py-3.5 font-bold text-white">ML-KEM-768 (Kyber)</td>
+                    <td className="py-3.5 text-[#94A3B8]">Module Lattice-Based Cryptography</td>
+                    <td className="py-3.5 text-green-400">~128-bit classical security</td>
+                    <td className="py-3.5 text-green-400">~128-bit quantum security (Immune)</td>
+                    <td className="py-3.5">
+                      <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded text-[10px]">Compliant (NIST Std)</span>
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-[#1A2540]/30 transition">
+                    <td className="py-3.5 font-bold text-white">ML-DSA-65 (Dilithium)</td>
+                    <td className="py-3.5 text-[#94A3B8]">Lattice Digital Signatures</td>
+                    <td className="py-3.5 text-green-400">~128-bit security</td>
+                    <td className="py-3.5 text-green-400">~128-bit security (Immune)</td>
+                    <td className="py-3.5">
+                      <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded text-[10px]">Compliant (NIST Std)</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Quick FAQ / Insights */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 space-y-2">
+              <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Info size={16} className="text-[#00C4E8]" />
+                Why are asymmetric algorithms broken?
+              </h4>
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Asymmetric algorithms (RSA, ECC) rely on the mathematical difficulty of factoring numbers or finding discrete logarithms. Shor's algorithm utilizes quantum superposition and period finding via the Quantum Fourier Transform to solve these equations in polynomial time (O(n^3)), rendering them completely insecure.
+              </p>
+            </div>
+            <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-5 space-y-2">
+              <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Info size={16} className="text-[#00C4E8]" />
+                Why are symmetric ciphers and PQC immune?
+              </h4>
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Symmetric ciphers (AES) do not have this underlying algebraic structure; they rely on confusion and diffusion. Grover's algorithm only offers a quadratic speedup (O(√2^N)). Doubling key sizes (using AES-256) maintains full quantum security. Post-Quantum Cryptography (PQC) standards use lattice structures that do not possess the factoring periodicities Shor's algorithm exploits.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quantum Circuit Architecture Summary */}
+      {activeTab !== 'comparison' && (
+        <div className="bg-[#0D1421] border border-[#1E2D45] rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b border-[#1E2D45] pb-3">
+            <Layers size={18} className="text-[#00C4E8]" />
+            <h3 className="text-sm font-bold text-white">Quantum Attack Circuit Architecture</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-[#475569] uppercase tracking-wider block">Estimated Circuit Complexity</span>
+              <table className="w-full text-left border-collapse font-mono text-xs">
+                <tbody>
+                  <tr className="border-b border-[#1E2D45]/40">
+                    <td className="py-2.5 text-slate-300">Initialization & Register Superposition</td>
+                    <td className="py-2.5 text-right text-[#00C4E8]">2,100 gates</td>
+                  </tr>
+                  <tr className="border-b border-[#1E2D45]/40">
+                    <td className="py-2.5 text-slate-300">Modular Exponentiation (Oracles)</td>
+                    <td className="py-2.5 text-right text-[#FF9500]">{activeTab === 'shors' ? '298,500' : '2,400,000'} gates</td>
+                  </tr>
+                  <tr className="border-b border-[#1E2D45]/40">
+                    <td className="py-2.5 text-slate-300">QFT / Diffusion Operators</td>
+                    <td className="py-2.5 text-right text-[#EF4444]">{activeTab === 'shors' ? '156,000' : '1,200,000'} gates</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 text-slate-300">Measurement & Output Decollapse</td>
+                    <td className="py-2.5 text-right text-slate-400">46,214 gates</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-[#475569] uppercase tracking-wider block">Simplified Algebraic Trace</span>
+              <div className="bg-[#080C14] border border-[#1E2D45]/60 rounded-xl p-4 font-mono text-[11px] text-slate-400 leading-relaxed">
+                {activeTab === 'shors' ? (
+                  <>
+                    <span className="text-[#00C4E8]">|ψ⟩ ──[H]──[ModExp]────[QFT†]──[M]──ϕ</span>
+                    <p className="mt-3">
+                      Where:<br />
+                      • H = Hadamard initialization matrix<br />
+                      • ModExp = Modular multiplication gate sequence<br />
+                      • QFT† = Inverse Quantum Fourier Transform<br />
+                      • M = Measurement detector
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[#A855F7]">|s⟩ ──[H]──[Oracle]────[Diffusion]──[M]──ω</span>
+                    <p className="mt-3">
+                      Where:<br />
+                      • Oracle = Inverts target state phase sign<br />
+                      • Diffusion = Inverts state amplitudes around mean value<br />
+                      • M = Detector reading state coordinates
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
