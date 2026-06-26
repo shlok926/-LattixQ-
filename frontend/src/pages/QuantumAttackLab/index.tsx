@@ -391,16 +391,21 @@ Verdict: Symmetric constructs (Even-Mansour) are vulnerable to polynomial-time k
         const jobId = resp.data.job_id;
         
         let currentMs = 0;
+        let consecutiveErrors = 0;
         const timer = setInterval(async () => {
-          currentMs += 200;
+          currentMs += 1000;
           setElapsedTime(Number((currentMs / 1000).toFixed(1)));
           
           try {
             const statusResp = await api.get(`/simulation/status/${jobId}`);
             const statusData = statusResp.data;
+            consecutiveErrors = 0;
             
-            if (statusData.status === 'RUNNING') {
-              setSimProgress(prev => Math.min(90, prev + 10));
+            if (statusData.status === 'PENDING') {
+              setSimProgress(15);
+              setSimPhase(1);
+            } else if (statusData.status === 'RUNNING') {
+              setSimProgress(prev => Math.min(85, Math.max(30, prev + 10)));
               setSimPhase(2);
             } else if (statusData.status === 'COMPLETED') {
               clearInterval(timer);
@@ -417,9 +422,15 @@ Verdict: Symmetric constructs (Even-Mansour) are vulnerable to polynomial-time k
               startLocalTimer();
             }
           } catch (e) {
-            setSimProgress(prev => Math.min(95, prev + 5));
+            consecutiveErrors++;
+            if (consecutiveErrors >= 5) {
+              clearInterval(timer);
+              startLocalTimer();
+            } else {
+              setSimProgress(prev => Math.min(90, prev + 2));
+            }
           }
-        }, 200);
+        }, 1000);
       } catch (err) {
         startLocalTimer();
       }
