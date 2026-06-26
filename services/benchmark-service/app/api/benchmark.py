@@ -10,6 +10,7 @@ runner = BenchmarkRunner()
 
 @router.post("/run")
 async def trigger_benchmark(background_tasks: BackgroundTasks):
+    await runner.redis.delete("bench:latest")
     background_tasks.add_task(runner.run_full_suite)
     return {"status": "Benchmark started in background"}
 

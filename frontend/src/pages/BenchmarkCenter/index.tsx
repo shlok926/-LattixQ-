@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import AlgorithmBadge from '../../components/ui/AlgorithmBadge';
 import NistBadge from '../../components/ui/NistBadge';
+import { api } from '../../services/api';
 
 const ALGO_COLORS: Record<string, string> = {
   'RSA-2048': '#EF4444',
@@ -31,7 +32,7 @@ const ALGO_COLORS: Record<string, string> = {
   'SPHINCS+': '#86EFAC',
 };
 
-const benchmarkData = [
+const DEFAULT_BENCHMARK_DATA = [
   { algo: 'RSA-2048',      keygen: 823.4, sign: 2.1,   verify: 0.08, keySize: 256,   sigSize: 256,  level: 1,  safe: false, type: 'Asymmetric' },
   { algo: 'ECC-256',       keygen: 12.3,  sign: 0.9,   verify: 0.7,  keySize: 64,    sigSize: 64,   level: 1,  safe: false, type: 'Asymmetric' },
   { algo: 'AES-256',       keygen: 0.02,  sign: 0,     verify: 0,    keySize: 32,    sigSize: 0,    level: 3,  safe: true,  type: 'Symmetric' },
@@ -41,9 +42,52 @@ const benchmarkData = [
   { algo: 'SPHINCS+',      keygen: 0.9,   sign: 15.2,  verify: 1.1,  keySize: 32,    sigSize: 8080, level: 1,  safe: true,  type: 'Signature' },
 ];
 
+const mapBackendResults = (backendData: any[]) => {
+  return backendData.map(item => {
+    let algoName = item.algorithm;
+    let type = 'Signature';
+    
+    if (algoName.includes('RSA')) {
+      algoName = 'RSA-2048';
+      type = 'Asymmetric';
+    } else if (algoName.includes('ECC')) {
+      algoName = 'ECC-256';
+      type = 'Asymmetric';
+    } else if (algoName.includes('AES')) {
+      algoName = 'AES-256';
+      type = 'Symmetric';
+    } else if (algoName.includes('Kyber')) {
+      algoName = 'Kyber-768';
+      type = 'KEM';
+    } else if (algoName.includes('Dilithium')) {
+      algoName = 'Dilithium3';
+      type = 'Signature';
+    } else if (algoName.includes('Falcon')) {
+      algoName = 'FALCON-512';
+      type = 'Signature';
+    } else if (algoName.includes('SPHINCS')) {
+      algoName = 'SPHINCS+';
+      type = 'Signature';
+    }
+
+    return {
+      algo: algoName,
+      keygen: item.keygen_ms,
+      sign: item.sign_ms,
+      verify: item.verify_ms,
+      keySize: item.pk_size_bytes,
+      sigSize: item.sig_size_bytes,
+      level: item.nist_security_level || (algoName.includes('RSA') || algoName.includes('ECC') ? 1 : 3),
+      safe: item.quantum_safe,
+      type: type
+    };
+  });
+};
+
 export const BenchmarkCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'time' | 'size' | 'security' | 'table'>('time');
   const [isRunning, setIsRunning] = useState(false);
+  const [dataList, setDataList] = useState<any[]>(DEFAULT_BENCHMARK_DATA);
 
   // Radar selection limit state (Section 3B)
   const [selectedRadarAlgos, setSelectedRadarAlgos] = useState<string[]>([
@@ -67,28 +111,66 @@ export const BenchmarkCenter: React.FC = () => {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleRunBenchmark = () => {
+  const loadLatestResults = async () => {
+    try {
+      const response = await api.get('/benchmark/results');
+      if (response.data) {
+        const mapped = mapBackendResults(response.data);
+        setDataList(mapped);
+      }
+    } catch (e) {
+      console.warn("Could not fetch latest benchmark results, using default values.");
+    }
+  };
+
+  useEffect(() => {
+    loadLatestResults();
+  }, []);
+
+  const handleRunBenchmark = async () => {
     setIsRunning(true);
-    setTimeout(() => {
+    triggerToast("Benchmark suite started on backend server...");
+    try {
+      await api.post('/benchmark/run', {});
+      
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const response = await api.get('/benchmark/results');
+          if (response.data) {
+            const mapped = mapBackendResults(response.data);
+            setDataList(mapped);
+            clearInterval(interval);
+            setIsRunning(false);
+            triggerToast("Benchmark suite run complete. All charts updated!");
+          }
+        } catch (e) {
+          if (attempts >= 15) {
+            clearInterval(interval);
+            setIsRunning(false);
+            triggerToast("Benchmark run timed out.");
+          }
+        }
+      }, 2000);
+    } catch (err) {
       setIsRunning(false);
-      triggerToast("Benchmark suite run complete. All tabs updated.");
-    }, 3000);
+      triggerToast("Failed to trigger benchmark.");
+    }
   };
 
   // --- TIME METRICS CALCULATIONS ---
-  // Filter AES-256 out of the main time metrics chart (Section 1D)
-  // Also mapping 0 values to null so recharts omits the bars entirely (Section 1F)
-  const timeChartData = [
-    { algo: 'RSA-2048',    keygen: 823.4, sign: 2.1,  verify: 0.08 },
-    { algo: 'ECC-256',     keygen: 12.3,  sign: 0.9,  verify: 0.7 },
-    { algo: 'Kyber-768',   keygen: 0.08,  sign: null, verify: null },
-    { algo: 'Dilithium3',  keygen: 0.1,   sign: 0.08, verify: 0.04 },
-    { algo: 'FALCON-512',  keygen: 8.1,   sign: 0.5,  verify: 0.03 },
-    { algo: 'SPHINCS+',    keygen: 0.9,   sign: 15.2, verify: 1.1 }
-  ];
+  const timeChartData = dataList
+    .filter(d => d.algo !== 'AES-256')
+    .map(d => ({
+      algo: d.algo,
+      keygen: d.keygen || null,
+      sign: d.sign || null,
+      verify: d.verify || null,
+    }));
 
-  const rsaKeyGen = benchmarkData.find(d => d.algo === 'RSA-2048')?.keygen || 823.4;
-  const kyberKeyGen = benchmarkData.find(d => d.algo === 'Kyber-768')?.keygen || 0.08;
+  const rsaKeyGen = dataList.find(d => d.algo === 'RSA-2048')?.keygen || 823.4;
+  const kyberKeyGen = dataList.find(d => d.algo === 'Kyber-768')?.keygen || 0.08;
   const timeMultiplier = Math.round(rsaKeyGen / kyberKeyGen);
   const timeNoteText = `RSA-2048 key generation (${rsaKeyGen}ms) is over ${timeMultiplier.toLocaleString()}× slower than Kyber-768 (${kyberKeyGen}ms) — the fastest post-quantum alternative in this comparison.`;
 
@@ -100,18 +182,15 @@ export const BenchmarkCenter: React.FC = () => {
   };
 
   // --- SIZE METRICS CALCULATIONS ---
-  const sizeChartData = [
-    { algo: 'RSA-2048',    keySize: 256,  sigSize: 256 },
-    { algo: 'ECC-256',     keySize: 64,   sigSize: 64 },
-    { algo: 'Kyber-768',   keySize: 1184, sigSize: null },
-    { algo: 'Dilithium3',  keySize: 1952, sigSize: 3293 },
-    { algo: 'FALCON-512',  keySize: 897,  sigSize: 666 },
-    { algo: 'SPHINCS+',    keySize: 32,   sigSize: 8080 }
-  ];
+  const sizeChartData = dataList.map(d => ({
+    algo: d.algo,
+    keySize: d.keySize || null,
+    sigSize: d.sigSize || null,
+  }));
 
-  const falconSig = benchmarkData.find(d => d.algo === 'FALCON-512')?.sigSize || 666;
-  const dilithiumSig = benchmarkData.find(d => d.algo === 'Dilithium3')?.sigSize || 3293;
-  const eccSig = benchmarkData.find(d => d.algo === 'ECC-256')?.sigSize || 64;
+  const falconSig = dataList.find(d => d.algo === 'FALCON-512')?.sigSize || 666;
+  const dilithiumSig = dataList.find(d => d.algo === 'Dilithium3')?.sigSize || 3293;
+  const eccSig = dataList.find(d => d.algo === 'ECC-256')?.sigSize || 64;
   const sizeNoteText = `FALCON-512 produces the most compact post-quantum signature at ${falconSig.toLocaleString()} bytes — smaller than Dilithium3's ${dilithiumSig.toLocaleString()} bytes but still larger than ECC-256's ${eccSig} bytes.`;
 
   const formatSizeLabel = (value: any) => {
@@ -120,11 +199,11 @@ export const BenchmarkCenter: React.FC = () => {
   };
 
   // --- RADAR CHART NORMALIZATION (Section 3A) ---
-  const maxKeyGen = Math.max(...benchmarkData.map(d => d.keygen));
-  const maxSign = Math.max(...benchmarkData.map(d => d.sign || 0));
-  const maxVerify = Math.max(...benchmarkData.map(d => d.verify || 0));
-  const maxKeySize = Math.max(...benchmarkData.map(d => d.keySize));
-  const maxSigSize = Math.max(...benchmarkData.map(d => d.sigSize || 0));
+  const maxKeyGen = Math.max(...dataList.map(d => d.keygen));
+  const maxSign = Math.max(...dataList.map(d => d.sign || 0));
+  const maxVerify = Math.max(...dataList.map(d => d.verify || 0));
+  const maxKeySize = Math.max(...dataList.map(d => d.keySize));
+  const maxSigSize = Math.max(...dataList.map(d => d.sigSize || 0));
 
   const normalizeSpeed = (val: number, max: number) => {
     if (!val) return 0;
@@ -151,7 +230,7 @@ export const BenchmarkCenter: React.FC = () => {
 
   const dynamicRadarData = subjects.map(subj => {
     const item: Record<string, any> = { subject: subj.label };
-    benchmarkData.forEach(algoData => {
+    dataList.forEach(algoData => {
       let val = 0;
       if (subj.key === 'keygen') val = normalizeSpeed(algoData.keygen, maxKeyGen);
       else if (subj.key === 'sign') val = normalizeSpeed(algoData.sign || 0, maxSign);
@@ -176,7 +255,7 @@ export const BenchmarkCenter: React.FC = () => {
   };
 
   const getSortedTableData = () => {
-    const data = [...benchmarkData];
+    const data = [...dataList];
     if (sortField) {
       data.sort((a: any, b: any) => {
         let valA = a[sortField];
@@ -461,7 +540,7 @@ export const BenchmarkCenter: React.FC = () => {
             <div className="w-full space-y-2">
               <span className="text-[10px] font-bold text-[#475569] uppercase tracking-wider block">Compare Algorithms (Select up to 4)</span>
               <div className="flex flex-wrap gap-2 bg-[#080C14] border border-[#1E2D45] rounded-lg p-2">
-                {benchmarkData.map(d => {
+                {dataList.map((d: any) => {
                   const isChecked = selectedRadarAlgos.includes(d.algo);
                   return (
                     <button
