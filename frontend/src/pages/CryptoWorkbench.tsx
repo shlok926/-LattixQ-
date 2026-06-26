@@ -42,7 +42,7 @@ const ALGORITHMS: Record<string, AlgorithmDetail> = {
     nistLevel: 'None',
     verdict: 'QUANTUM-VULNERABLE',
     mathBasis: 'Integer Factorization',
-    quantumAttack: "Shor's algorithm factors integers in polynomial time ($O(n^3)$), completely breaking RSA."
+    quantumAttack: "Shor's algorithm factors integers in polynomial time O(n³), completely breaking RSA."
   },
   'ECDSA-P256': {
     name: 'ECDSA-P256',
@@ -66,7 +66,7 @@ const ALGORITHMS: Record<string, AlgorithmDetail> = {
     nistLevel: 'Category 3',
     verdict: 'QUANTUM-SAFE',
     mathBasis: 'Module Learning With Errors (M-LWE)',
-    quantumAttack: "Shor's algorithm does not apply. Best quantum attacks (lattice sieving) require $2^{128}$ quantum operations."
+    quantumAttack: "Shor's algorithm does not apply. Best quantum attacks (lattice sieving) require 2¹²⁸ quantum operations."
   },
   'ML-DSA-653': {
     name: 'ML-DSA-653 (Dilithium)',
@@ -90,7 +90,7 @@ const ALGORITHMS: Record<string, AlgorithmDetail> = {
     nistLevel: 'Category 1',
     verdict: 'PARTIALLY-AFFECTED',
     mathBasis: 'Symmetric Block Substitution',
-    quantumAttack: "Grover's algorithm speeds up search quadratically ($O(\\sqrt{N})$), reducing effective key strength to 64 bits."
+    quantumAttack: "Grover's algorithm speeds up search quadratically O(√N), reducing effective key strength to 64 bits."
   },
   'AES-256': {
     name: 'AES-256',
