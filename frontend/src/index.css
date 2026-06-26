@@ -43,7 +43,7 @@
 body {
   background-color: #080C14;
   color: #E2E8F0;
-  font-family: 'Times New Roman', Times, serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 code, .font-mono {
