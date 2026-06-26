@@ -37,12 +37,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, disabled
       <div className="relative flex items-end gap-2 max-w-4xl mx-auto bg-[#0D1421] border border-[#1E2D45] rounded-2xl p-1.5 focus-within:border-[#00C4E8]/50 focus-within:shadow-[0_0_15px_rgba(0,196,232,0.05)] transition-all">
         <textarea
           ref={textareaRef}
+          id="chat-input-textarea"
+          name="chat-input"
           rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={isStreaming ? "Streaming response..." : "Ask Lattix - Q AI analyst..."}
           disabled={disabled || isStreaming}
+          aria-label="Ask Lattix - Q AI analyst"
+          aria-disabled={disabled || isStreaming}
           className="flex-1 resize-none bg-transparent py-2 px-3 text-sm text-white placeholder-slate-500 focus:outline-none max-h-40 min-h-[38px] leading-relaxed"
         />
 
@@ -52,6 +56,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, disabled
               onClick={onCancel}
               className="flex items-center justify-center p-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer w-8 h-8"
               title="Stop generating"
+              aria-label="Stop generating response"
             >
               <div className="w-2.5 h-2.5 bg-red-500 rounded-sm" />
             </button>
@@ -59,6 +64,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onCancel, disabled
             <button
               onClick={handleSend}
               disabled={!text.trim() || disabled}
+              aria-label="Send message"
               className="flex items-center justify-center p-2 rounded-xl bg-[#00C4E8] text-[#080C14] hover:bg-[#00C4E8]/85 disabled:opacity-30 disabled:hover:bg-[#00C4E8] transition-all cursor-pointer w-8 h-8"
             >
               <svg className="w-4 h-4 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">

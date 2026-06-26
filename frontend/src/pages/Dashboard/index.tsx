@@ -640,10 +640,14 @@ export const Dashboard: React.FC = () => {
       
       {/* Toast Notification Popup */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 bg-[#0F1D36] border border-[#00C4E8]/40 text-[#E2E8F0] px-4 py-3 rounded-lg shadow-2xl flex items-center gap-3 z-50 animate-bounce duration-500 max-w-sm">
-          <Activity size={18} className="text-[#00C4E8] animate-pulse" />
+        <div className="fixed top-6 right-6 bg-[#0D1421]/90 backdrop-blur-md border border-[#00C4E8]/30 text-[#E2E8F0] px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(0,196,232,0.15)] flex items-center gap-3 z-50 max-w-sm animate-slide-in hover:scale-[1.02] transition-transform">
+          <div className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00C4E8] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00C4E8]"></span>
+          </div>
+          <Activity size={18} className="text-[#00C4E8]" />
           <span className="text-xs font-semibold">{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white ml-auto">
+          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white ml-auto cursor-pointer">
             <X size={14} />
           </button>
         </div>
