@@ -44,7 +44,14 @@ class ShorsAlgorithm:
         qc = build_shors_circuit(N, a, n_count)
         
         factors = [3, 5]
-        qasm = qc.qasm()
+        try:
+            from qiskit import qasm2
+            qasm = qasm2.dumps(qc)
+        except Exception:
+            try:
+                qasm = qc.qasm()
+            except Exception:
+                qasm = "// QASM Export Failed"
         nodes = [{"name": "h", "qubit": 0}, {"name": "cx", "qubits": [0, 1]}, {"name": "measure", "qubit": 0}]
 
         if self.ibm_token:

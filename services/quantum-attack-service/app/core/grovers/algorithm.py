@@ -70,11 +70,20 @@ class GroversAlgorithm:
         
         probs = {k: v / 1024.0 for k, v in counts.items()}
         
+        try:
+            from qiskit import qasm2
+            qasm = qasm2.dumps(qc)
+        except Exception:
+            try:
+                qasm = qc.qasm()
+            except Exception:
+                qasm = "// QASM Export Failed"
+        
         return GroversResult(
             effective_security_bits=effective_bits,
             is_vulnerable=is_vulnerable,
             iterations=iterations,
-            circuit_qasm=qc.qasm(),
+            circuit_qasm=qasm,
             circuit_nodes=[{"name": "h", "qubit": 0}],
             probability_amplitudes=probs
         )
