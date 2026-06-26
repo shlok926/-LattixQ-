@@ -188,6 +188,25 @@ except Exception as e:
     print(f"Error during JWT audit: {e}")
     sys.exit(1)
 
+# Step 9: Classical SSL Domain Scan
+print("\n--- Step 9: Classical SSL Domain Scan Verification ---")
+scan_url = f"{BASE_URL}/classical/scan-domain"
+scan_payload = {
+    "domain": "google.com"
+}
+try:
+    response = session.post(scan_url, json=scan_payload, timeout=10)
+    print(f"Status Code: {response.status_code}")
+    print(f"Response JSON: {response.json()}")
+    assert response.status_code == 200, "Domain scanner failed!"
+    data = response.json()
+    assert data.get("domain") == "google.com", "Scanned domain mismatch!"
+    assert "key_type" in data, "Key type missing from scan response!"
+    print("Classical SSL Domain Scan Verified Successfully.")
+except Exception as e:
+    print(f"Error during domain scan: {e}")
+    sys.exit(1)
+
 print("\n=============================================")
 print("  ALL E2E INTEGRATION TESTS PASSED SUCCESSFULLY!  ")
 print("=============================================")
