@@ -207,36 +207,24 @@ export const CryptoWorkbench: React.FC = () => {
   };
 
   // JWT Auditor Trigger
-  const handleAuditJwt = () => {
+  // JWT Auditor Trigger
+  const handleAuditJwt = async () => {
     if (!jwtInput.trim()) return;
     setIsAuditing(true);
-    setTimeout(() => {
-      try {
-        const parts = jwtInput.trim().split('.');
-        if (parts.length < 2) {
-          alert('Invalid JWT format');
-          return;
-        }
-        const headerDecoded = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
-        const payloadDecoded = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        
-        const alg = headerDecoded.alg || 'unknown';
-        const isVulnerable = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'HS256', 'HS384'].includes(alg);
-
-        setJwtResult({
-          header: headerDecoded,
-          payload: payloadDecoded,
-          verdict: isVulnerable ? 'VULNERABLE' : 'SAFE',
-          reason: isVulnerable 
-            ? `Algorithm ${alg} relies on integer factorization or discrete logarithm, broken by Shor's algorithm.`
-            : `Algorithm ${alg} is considered quantum-safe.`
-        });
-      } catch (err) {
-        alert('Failed to parse JWT. Ensure it is base64 encoded.');
-      } finally {
-        setIsAuditing(false);
-      }
-    }, 600);
+    try {
+      const response = await api.post('/classical/jwt/audit', { token: jwtInput.trim() });
+      setJwtResult({
+        header: response.data.header,
+        payload: response.data.payload,
+        verdict: response.data.verdict,
+        reason: response.data.reason
+      });
+    } catch (err: any) {
+      console.error("JWT Audit failed:", err);
+      alert(err.response?.data?.detail || 'Failed to audit JWT. Ensure it is a valid base64 encoded token.');
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   return (

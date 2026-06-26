@@ -1,5 +1,6 @@
 import httpx
 from fastapi import APIRouter, Request, HTTPException, Depends
+from pydantic import BaseModel
 from app.config import settings
 from app.middleware.auth import verify_jwt
 from app.middleware.rate_limit import limiter
@@ -144,3 +145,45 @@ async def scan_domain(request: Request, body: dict):
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SSL scan failed: {str(e)}")
+
+class JwtAuditReq(BaseModel):
+    token: str
+
+@router.post("/jwt/audit")
+@limiter.limit("20/minute")
+async def audit_jwt_token(request: Request, body: JwtAuditReq):
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+    
+    try:
+        parts = token.split('.')
+        if len(parts) < 2:
+            raise HTTPException(status_code=400, detail="Invalid JWT format")
+            
+        import base64
+        import json
+        
+        def decode_pad(s):
+            s = s.replace('-', '+').replace('_', '/')
+            s += '=' * (4 - len(s) % 4)
+            return base64.b64decode(s).decode('utf-8')
+            
+        header_str = decode_pad(parts[0])
+        payload_str = decode_pad(parts[1])
+        
+        header = json.loads(header_str)
+        payload = json.loads(payload_str)
+        
+        alg = header.get("alg", "unknown")
+        is_vulnerable = alg in ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'HS256', 'HS384']
+        
+        return {
+            "header": header,
+            "payload": payload,
+            "verdict": "VULNERABLE" if is_vulnerable else "SAFE",
+            "reason": f"Algorithm {alg} is quantum-vulnerable because it relies on integer factorization or discrete logarithm, easily broken by Shor's algorithm." if is_vulnerable else f"Algorithm {alg} is considered quantum-safe."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse JWT: {str(e)}")
+
