@@ -74,26 +74,73 @@ Enterprises must transition immediately to lattice-based cryptographic algorithm
 Lattix-Q uses a decoupled, containerized microservices mesh orchestrated via `docker-compose` and routed through an **Nginx reverse proxy** acting as a unified API Gateway.
 
 ```mermaid
-graph TD
-    Client[Web Browser / CLI] -->|Port 80 / 443| Nginx[Nginx Reverse Proxy]
+flowchart TB
+    %% Subgraphs representing styled containers
+    subgraph UI ["Ingress & Frontend Portal"]
+        Client["User Browser / CLI"]
+        Nginx["Nginx Reverse Proxy (Port 80/443)"]
+        Frontend["React Frontend Console (Port 3000)"]
+    end
+
+    subgraph GW ["Authentication & Gateway Core"]
+        Gateway["API Gateway (Port 8000)"]
+        Postgres[("PostgreSQL Database (Port 5432)")]
+    end
+
+    subgraph LAB ["Quantum & Cryptographic Services"]
+        AttackSvc["Quantum Attack Engine (Port 8001)"]
+        ClassicalSvc["Classical Crypto Audit (Port 8002)"]
+        PQCSvc["PQC Algorithm Suite (Port 8003)"]
+        BenchmarkSvc["Performance Benchmarking (Port 8004)"]
+        ReportSvc["Compliance Report Engine (Port 8005)"]
+        AISvc["AI Threat Analyst (Port 8006)"]
+    end
+
+    subgraph ASYNC ["Asynchronous Task Queue"]
+        Redis["Redis Message Broker (Port 6379)"]
+        CeleryWorker["Celery Simulation Worker"]
+    end
+
+    subgraph MON ["Observability Stack"]
+        Prometheus["Prometheus Telemetry (Port 9090)"]
+        Grafana["Grafana Dashboards (Port 3001)"]
+    end
+
+    %% Flow Connections
+    Client --> Nginx
+    Nginx -->|Routes static UI| Frontend
+    Nginx -->|Routes API calls| Gateway
     
-    Nginx -->|Route / | Frontend[React Frontend: Port 3000]
-    Nginx -->|Route /v1 | APIGateway[API Gateway: Port 8000]
+    Gateway -->|JWT Auth & DB Session| Postgres
+    Gateway -->|API calls| LAB
     
-    APIGateway -->|REST / Redis| AttackSvc[Quantum Attack Service: Port 8001]
-    APIGateway -->|REST| ClassicalSvc[Classical Crypto Service: Port 8002]
-    APIGateway -->|REST| PQCSvc[PQC Service: Port 8003]
-    APIGateway -->|REST| BenchmarkSvc[Benchmark Service: Port 8004]
-    APIGateway -->|REST| ReportSvc[Report Service: Port 8005]
-    APIGateway -->|REST| AISvc[AI Analyst Service: Port 8006]
+    AttackSvc -->|Pub/Sub Trigger| Redis
+    Redis -->|Process simulation| CeleryWorker
     
-    AttackSvc -->|Broker| Redis[Redis Message Broker: Port 6379]
-    Redis -->|Queue Tasks| Worker[Celery Simulation Worker]
-    
-    APIGateway -->|Storage| Postgres[(PostgreSQL DB: Port 5432)]
-    
-    Prometheus[Prometheus: Port 9090] -->|Scrapes Metrics| APIGateway
-    Grafana[Grafana Dashboard: Port 3001] -->|Queries Data| Prometheus
+    Gateway -->|Collect metrics| Prometheus
+    Prometheus -->|Visual dashboards| Grafana
+
+    %% Node styling classes
+    classDef uiClass fill:#1d3557,stroke:#457b9d,stroke-width:2px,color:#fff;
+    classDef gwClass fill:#1b4d3e,stroke:#2d6a4f,stroke-width:2px,color:#fff;
+    classDef dbClass fill:#7b1113,stroke:#9b2226,stroke-width:2px,color:#fff;
+    classDef labClass fill:#4a148c,stroke:#7b1fa2,stroke-width:2px,color:#fff;
+    classDef asyncClass fill:#e65100,stroke:#f57c00,stroke-width:2px,color:#fff;
+    classDef monClass fill:#006064,stroke:#00838f,stroke-width:2px,color:#fff;
+
+    class Client,Nginx,Frontend uiClass;
+    class Gateway gwClass;
+    class Postgres,Redis dbClass;
+    class AttackSvc,ClassicalSvc,PQCSvc,BenchmarkSvc,ReportSvc,AISvc labClass;
+    class CeleryWorker asyncClass;
+    class Prometheus,Grafana monClass;
+
+    %% Subgraph styling (dark containers)
+    style UI fill:#18181b,stroke:#27272a,stroke-width:1px,color:#fff
+    style GW fill:#18181b,stroke:#27272a,stroke-width:1px,color:#fff
+    style LAB fill:#18181b,stroke:#27272a,stroke-width:1px,color:#fff
+    style ASYNC fill:#18181b,stroke:#27272a,stroke-width:1px,color:#fff
+    style MON fill:#18181b,stroke:#27272a,stroke-width:1px,color:#fff
 ```
 
 ---
