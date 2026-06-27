@@ -252,9 +252,10 @@ If you see `error during connect: daemon not response`, make sure **Docker Deskt
 
 ## 11. Future Improvements
 
-* **Identity Provider Integration**: Migration of local user state databases to SAML 2.0 / OpenID Connect (OIDC) via Okta or Active Directory.
-* **CI/CD Integration**: Creating a headless CLI scanner wrapper to automate vulnerability checks during push pipelines.
-* **Hardware Security Modules (HSM)**: Enabling backend integrations to test PQC performance on local virtual HSM instances.
+* **Active DAST Endpoint Scanning**: Extending the CLI scanner capabilities to dynamically probe live target services and audit their TLS cipher suites for classical ciphers.
+* **Identity Provider Integration**: Migrating local credentials database to SAML 2.0 / OpenID Connect (OIDC) via Okta or Microsoft Entra ID (Azure AD).
+* **Virtual HSM Emulation**: Integrating virtual Hardware Security Modules (SoftHSM) to validate physical post-quantum signature verification overhead.
+* **Kubernetes Orchestration**: Publishing Helm charts to support deploying Lattix-Q microservices across scalable EKS/GKE clusters.
 
 ---
 
