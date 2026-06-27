@@ -1,0 +1,31 @@
+name: Cryptographic Vulnerability Audit
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  audit-security:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Execute Lattix-Q CLI Scan
+      run: |
+        python lattix_q_scanner.py --path . --fail-on-high --output report.json
+
+    - name: Archive Scan Report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: lattix-q-scan-report
+        path: report.json
