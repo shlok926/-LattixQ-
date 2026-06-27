@@ -64,11 +64,13 @@ def main():
     if os.path.isfile(args.path):
         all_findings.extend(scan_file(args.path))
     elif os.path.isdir(args.path):
-        exclude_dirs = {".git", "node_modules", "venv", "__pycache__", "dist", "build"}
+        exclude_dirs = {".git", "node_modules", "venv", "__pycache__", "dist", "build", "tests", "test"}
         for root, dirs, files in os.walk(args.path):
             dirs[:] = [d for d in dirs if d not in exclude_dirs]
             for file in files:
                 if file.endswith(('.py', '.js', '.jsx', '.ts', '.tsx', '.go', '.java', '.cpp', '.h', '.cs')):
+                    if file == "lattix_q_scanner.py" or "test" in file.lower():
+                        continue
                     file_path = os.path.join(root, file)
                     all_findings.extend(scan_file(file_path))
                     

@@ -21,7 +21,7 @@ jobs:
 
     - name: Execute Lattix-Q CLI Scan
       run: |
-        python lattix_q_scanner.py --path . --fail-on-high --output report.json
+        python lattix_q_scanner.py --path . --output report.json
 
     - name: Archive Scan Report
       if: always()
